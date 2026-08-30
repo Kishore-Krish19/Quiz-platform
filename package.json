@@ -8,7 +8,18 @@
     "build": "vite build && esbuild server.ts --bundle --platform=node --format=cjs --packages=external --sourcemap --outfile=dist/server.cjs",
     "start": "node dist/server.cjs",
     "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "stress:setup": "tsx stress-test/setup.ts",
+    "stress:cleanup": "tsx stress-test/cleanup.ts",
+    "stress:10": "tsx stress-test/run-stress-test.ts --players 10",
+    "stress:25": "tsx stress-test/run-stress-test.ts --players 25",
+    "stress:40": "tsx stress-test/run-stress-test.ts --players 40",
+    "stress:50": "tsx stress-test/run-stress-test.ts --players 50",
+    "stress:75": "tsx stress-test/run-stress-test.ts --players 75",
+    "stress:100": "tsx stress-test/run-stress-test.ts --players 100",
+    "stress:ramp": "tsx stress-test/run-stress-test.ts --ramp",
+    "stress:all": "tsx stress-test/run-stress-test.ts --all",
+    "stress:help": "tsx stress-test/run-stress-test.ts --help"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",
