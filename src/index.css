@@ -1,0 +1,79 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #070b14;
+    color: #f5f7fa;
+  }
+
+  h1, h2, h3, .font-display {
+    font-family: 'Chakra Petch', sans-serif;
+    letter-spacing: 0.02em;
+  }
+
+  .font-mono-tech {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+/* Custom Arcade Tech Background Grid */
+.bg-tech-grid {
+  background-image: 
+    linear-gradient(to right, rgba(0, 229, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(0, 229, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.bg-radial-vignette {
+  background: radial-gradient(circle at 50% 30%, rgba(0, 229, 255, 0.08) 0%, rgba(7, 11, 20, 0.95) 75%);
+}
+
+/* Arcade Neon Glows */
+.glow-cyan {
+  box-shadow: 0 0 20px -3px rgba(0, 229, 255, 0.4);
+}
+
+.glow-cyan-sm {
+  box-shadow: 0 0 10px -2px rgba(0, 229, 255, 0.35);
+}
+
+.glow-yellow {
+  box-shadow: 0 0 20px -3px rgba(255, 214, 0, 0.4);
+}
+
+.glow-red {
+  box-shadow: 0 0 20px -3px rgba(255, 61, 87, 0.5);
+}
+
+/* Text glow */
+.text-glow-cyan {
+  text-shadow: 0 0 12px rgba(0, 229, 255, 0.6);
+}
+
+.text-glow-yellow {
+  text-shadow: 0 0 12px rgba(255, 214, 0, 0.6);
+}
+
+.text-glow-red {
+  text-shadow: 0 0 12px rgba(255, 61, 87, 0.6);
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #0d1322;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #1f2e4a;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #00e5ff;
+}

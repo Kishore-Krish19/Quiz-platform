@@ -1,0 +1,6 @@
+{
+  "name": "GADGET CODE — Technical Quiz Platform",
+  "description": "Real-time multiplayer technical quiz management system for LAN and competition deployment with authoritative game loop, admin controls, and live synchronized leaderboard.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

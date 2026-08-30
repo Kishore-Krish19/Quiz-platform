@@ -1,0 +1,23 @@
+{
+  "users": [],
+  "rounds": [],
+  "questions": [],
+  "answers": [],
+  "quizSession": {
+    "status": "WAITING",
+    "activeRoundId": null,
+    "activeRoundNumber": 1,
+    "activeRoundName": "Round 1 — Technical Quiz",
+    "currentQuestionId": null,
+    "currentQuestionNumber": null,
+    "totalQuestions": 0,
+    "questionStartedAt": null,
+    "questionEndsAt": null,
+    "duration": null,
+    "serverTime": 1788086972388,
+    "connectedPlayersCount": 0,
+    "answeredPlayersCount": 0,
+    "updatedAt": "2026-08-30T10:49:32.388Z"
+  },
+  "eventSettings": null
+}
