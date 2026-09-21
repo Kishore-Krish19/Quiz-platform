@@ -9,3 +9,9 @@ coverage/
 
 # Admin-uploaded quiz images (event content, not source)
 data/uploads/
+
+# Per-install token signing secret — never commit or share it
+data/.jwt-secret
+
+# MongoDB writes made during an outage, waiting to be replayed
+data/.mongo-pending.jsonl

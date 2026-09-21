@@ -24,6 +24,7 @@ import { LeaderboardTable } from '../../components/quiz/LeaderboardTable';
 import { useAuth } from '../../store/authContext';
 import { useSocket } from '../../store/socketContext';
 import { sounds } from '../../utils/soundEffects';
+import { enterFullscreenOnNextInteraction } from '../../utils/fullscreen';
 
 export const PlayerQuizPage: React.FC = () => {
   const { user, logout } = useAuth();
@@ -40,7 +41,7 @@ export const PlayerQuizPage: React.FC = () => {
   const lastProcessedQuestionId = useRef<string | null>(null);
   const lastResultSoundQuestionId = useRef<string | null>(null);
 
-  const currentQuestion = quizState?.activeQuestion || (quizState as any)?.currentQuestion;
+  const currentQuestion = quizState?.activeQuestion;
   const isQuestionActive = quizState?.status === 'QUESTION_ACTIVE';
   const isQuestionEnded = quizState?.status === 'QUESTION_ENDED';
   const isWaiting = quizState?.status === 'WAITING' || quizState?.status === 'IDLE';
@@ -56,16 +57,12 @@ export const PlayerQuizPage: React.FC = () => {
 
   // Find player's current leaderboard status
   const currentLeaderboardEntry = leaderboard.find((item) => item.playerId === user?.id);
-  const liveScore = currentLeaderboardEntry ? currentLeaderboardEntry.score : user?.score || 0;
+  const liveScore = currentLeaderboardEntry ? currentLeaderboardEntry.score : 0;
   const currentRank = currentLeaderboardEntry ? currentLeaderboardEntry.rank : '—';
 
   // Check player's answer status for this question
   const myAnswer =
-    lastAnswerResult && lastAnswerResult.questionId === currentQuestion?.id
-      ? lastAnswerResult
-      : (quizState as any)?.playerAnswers
-        ? (quizState as any).playerAnswers[user?.id || '']
-        : null;
+    lastAnswerResult && lastAnswerResult.questionId === currentQuestion?.id ? lastAnswerResult : null;
 
   // A reconnecting player gets their answer back from the server; that counts as
   // submitted too, otherwise the options unlock and the server rejects the retry.
@@ -77,9 +74,14 @@ export const PlayerQuizPage: React.FC = () => {
   const lockedOptionId = selectedOptionId || myAnswer?.selectedOptionId || null;
   const lockedOptionIndex =
     lockedOptionId && currentQuestion
-      ? currentQuestion.options.findIndex((opt: any) => opt.id === lockedOptionId)
+      ? currentQuestion.options.findIndex((opt) => opt.id === lockedOptionId)
       : -1;
-  const lockedOption = lockedOptionIndex >= 0 ? currentQuestion.options[lockedOptionIndex] : null;
+  const lockedOption =
+    currentQuestion && lockedOptionIndex >= 0 ? currentQuestion.options[lockedOptionIndex] : null;
+
+  // Sign-in puts the arena in full screen. A reload drops it and restores the session
+  // without a click, so the player's first click or key press here brings it back.
+  useEffect(() => enterFullscreenOnNextInteraction(), []);
 
   // Reset local selection when a new question arrives
   useEffect(() => {
@@ -271,7 +273,7 @@ export const PlayerQuizPage: React.FC = () => {
               <div className="flex flex-col items-center md:items-start text-center md:text-left gap-1">
                 <div className="flex items-center gap-2">
                   <span className="px-2.5 py-0.5 rounded bg-cyan-400/20 text-cyan-300 border border-cyan-400/40 font-mono-tech text-xs font-black uppercase">
-                    QUESTION {quizState?.currentQuestionNumber || currentQuestion.order} OF{' '}
+                    QUESTION {quizState?.currentQuestionNumber || currentQuestion.questionNumber} OF{' '}
                     {quizState?.totalQuestions}
                   </span>
                   <div className="flex items-center gap-1 font-mono-tech text-xs text-yellow-400 font-bold px-2 py-0.5 rounded bg-yellow-500/10 border border-yellow-500/30">
@@ -420,7 +422,7 @@ export const PlayerQuizPage: React.FC = () => {
                     </h4>
                     <span className="font-mono-tech text-xs">
                       {myAnswer?.isCorrect
-                        ? `Answered in ${(myAnswer.responseTimeMs / 1000).toFixed(2)}s • +${(myAnswer.points || (myAnswer as any).pointsEarned || 0).toLocaleString()} Points Awarded!`
+                        ? `Answered in ${(myAnswer.responseTimeMs / 1000).toFixed(2)}s • +${(myAnswer.points ?? 0).toLocaleString()} Points Awarded!`
                         : myAnswer
                           ? 'No points awarded for this question.'
                           : 'No answer was submitted before the timer ran out.'}
@@ -453,7 +455,7 @@ export const PlayerQuizPage: React.FC = () => {
         {isRoundComplete && (
           <div className="w-full max-w-3xl bg-[#0D1322] border-2 border-yellow-400/60 rounded-3xl p-6 md:p-10 flex flex-col items-center text-center shadow-[0_0_40px_rgba(255,214,0,0.25)] animate-fade-in">
             <div className="mb-4">
-              <RobotMascot mood="winner" size="lg" />
+              <RobotMascot mood="celebrating" size="lg" />
             </div>
 
             <span className="font-mono-tech text-xs font-extrabold uppercase px-3 py-1 rounded-full bg-yellow-400/20 text-yellow-300 border border-yellow-400/40 mb-2">

@@ -9,10 +9,125 @@ import {
   Play,
   CheckCircle2,
   Cpu,
+  KeyRound,
 } from 'lucide-react';
 import { sounds } from '../../utils/soundEffects';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { useSocket } from '../../store/socketContext';
+import { useAuth } from '../../store/authContext';
+import { api } from '../../services/api';
+
+const MIN_ADMIN_PASSWORD_LENGTH = 10;
+
+const AdminAccountCard: React.FC = () => {
+  const { user, login } = useAuth();
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+    setSuccess(false);
+    if (newPassword.length < MIN_ADMIN_PASSWORD_LENGTH) {
+      setError(`The new password must be at least ${MIN_ADMIN_PASSWORD_LENGTH} characters.`);
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setError('The new password and its confirmation do not match.');
+      return;
+    }
+    try {
+      setIsSaving(true);
+      const res = await api.changeAdminPassword(currentPassword, newPassword);
+      // The old token is now void everywhere; carry on with the one issued for this screen.
+      login(res.token, res.user);
+      setCurrentPassword('');
+      setNewPassword('');
+      setConfirmPassword('');
+      setSuccess(true);
+    } catch (err: any) {
+      setError(err.message || 'Failed to change the password');
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const inputClass =
+    'p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white text-sm outline-none font-mono-tech';
+
+  return (
+    <div className="bg-[#0D1322] border border-[#1F2E4A] rounded-3xl p-6 md:p-8 flex flex-col gap-4">
+      <div className="flex items-center gap-3">
+        <div className="p-2.5 rounded-xl bg-cyan-500/20 text-cyan-400">
+          <KeyRound className="w-6 h-6" />
+        </div>
+        <div>
+          <h3 className="font-display font-bold text-xl text-white">Admin Account</h3>
+          <span className="font-mono-tech text-xs text-slate-400">
+            Signed in as @{user?.username}. Changing the password signs out every other admin screen.
+          </span>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 font-mono-tech text-xs">
+          {error}
+        </div>
+      )}
+      {success && (
+        <div className="p-3 rounded-xl bg-emerald-500/20 border border-emerald-500/40 text-emerald-300 text-xs font-mono-tech flex items-center gap-2">
+          <CheckCircle2 className="w-4 h-4" />
+          <span>Password changed. Other admin screens must sign in again with the new password.</span>
+        </div>
+      )}
+
+      <form onSubmit={handleSubmit} className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <input
+          type="password"
+          autoComplete="current-password"
+          placeholder="Current password"
+          value={currentPassword}
+          onChange={(e) => setCurrentPassword(e.target.value)}
+          className={inputClass}
+          required
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          placeholder={`New password (${MIN_ADMIN_PASSWORD_LENGTH}+ chars)`}
+          value={newPassword}
+          onChange={(e) => setNewPassword(e.target.value)}
+          className={inputClass}
+          required
+        />
+        <input
+          type="password"
+          autoComplete="new-password"
+          placeholder="Confirm new password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          className={inputClass}
+          required
+        />
+        <p className="sm:col-span-2 text-[11px] text-slate-500 font-medium leading-relaxed self-center">
+          Forgotten it? Put a new value in ADMIN_PASSWORD in .env and restart the server — a changed value
+          resets the "admin" account's password.
+        </p>
+        <button
+          type="submit"
+          disabled={isSaving}
+          className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-xs tracking-wide disabled:opacity-50"
+        >
+          {isSaving ? 'SAVING...' : 'CHANGE PASSWORD'}
+        </button>
+      </form>
+    </div>
+  );
+};
 
 export const AdminSettingsPage: React.FC = () => {
   const { quizState, resetRound } = useSocket();
@@ -66,9 +181,11 @@ export const AdminSettingsPage: React.FC = () => {
           System Settings & Sound Diagnostics
         </h1>
         <p className="font-mono-tech text-xs text-slate-400">
-          Configure client sound synthesis, test audio cues, and manage global reset states.
+          Change the admin password, configure client sound synthesis, test audio cues, and manage global reset states.
         </p>
       </div>
+
+      <AdminAccountCard />
 
       {/* Sound Settings Card */}
       <div className="bg-[#0D1322] border border-[#1F2E4A] rounded-3xl p-6 md:p-8 flex flex-col gap-5">

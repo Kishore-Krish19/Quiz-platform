@@ -1,9 +1,12 @@
+// The admin password lives in .env (ADMIN_PASSWORD), same as for the server itself.
+import 'dotenv/config';
+
 export const STRESS_CONFIG = {
   BASE_URL: process.env.STRESS_BASE_URL || 'http://localhost:3000',
   SOCKET_URL: process.env.STRESS_SOCKET_URL || 'http://localhost:3000',
   ADMIN_USER: {
     username: process.env.ADMIN_USERNAME || 'admin',
-    password: process.env.ADMIN_PASSWORD || 'Admin@123',
+    password: process.env.ADMIN_PASSWORD || '',
   },
   PLAYER_PREFIX: 'stress_player_',
   DEFAULT_PASSWORD: 'stress_pass_123',

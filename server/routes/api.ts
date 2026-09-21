@@ -57,6 +57,7 @@ router.use(
 // Auth Routes
 router.post('/auth/login', AuthController.login);
 router.get('/auth/me', authenticateToken, AuthController.getMe);
+router.post('/auth/change-password', authenticateToken, requireRole('ADMIN'), AuthController.changeAdminPassword);
 
 // Public / Player Accessible Quiz Routes
 router.get('/quiz/state', authenticateToken, QuizController.getState);
@@ -75,6 +76,12 @@ router.post('/admin/quiz/reset-scores', authenticateToken, requireRole('ADMIN'),
 router.get('/admin/players', authenticateToken, requireRole('ADMIN'), AdminController.getPlayers);
 router.post('/admin/players', authenticateToken, requireRole('ADMIN'), AdminController.createPlayer);
 router.post('/admin/players/bulk', authenticateToken, requireRole('ADMIN'), AdminController.bulkCreatePlayers);
+router.post(
+  '/admin/players/reissue-passwords',
+  authenticateToken,
+  requireRole('ADMIN'),
+  AdminController.reissuePlayerPasswords
+);
 router.put('/admin/players/:id', authenticateToken, requireRole('ADMIN'), AdminController.updatePlayer);
 router.delete('/admin/players/:id', authenticateToken, requireRole('ADMIN'), AdminController.deletePlayer);
 

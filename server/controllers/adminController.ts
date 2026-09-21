@@ -2,7 +2,24 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import os from 'os';
 import { db } from '../config/db';
-import { quizEngine } from '../services/quizEngine';
+import type { StoredUser } from '../config/db';
+import { quizEngine, LiveQuestionConflictError } from '../services/quizEngine';
+import { generatePlayerPassword, hashPassword, playersSharingPasswords } from '../services/passwordService';
+import { releaseUnreferencedImages } from './uploadController';
+import type { IssuedCredential } from '../../src/types';
+
+/** Gives each account a freshly generated password of its own. Returned plaintext is shown to the admin once. */
+async function issueNewPasswords(players: StoredUser[]): Promise<IssuedCredential[]> {
+  const issued: IssuedCredential[] = [];
+  for (const player of players) {
+    const password = generatePlayerPassword();
+    const updated = db.updateUser(player.id, { passwordHash: await hashPassword(password) });
+    if (updated) {
+      issued.push({ playerId: updated.id, username: updated.username, displayName: updated.displayName, password });
+    }
+  }
+  return issued;
+}
 
 export class AdminController {
   // --- Players Management ---
@@ -10,6 +27,7 @@ export class AdminController {
     try {
       const users = db.getUsers().filter((u) => u.role === 'PLAYER');
       const connectedSet = quizEngine.getConnectedPlayerUserIds();
+      const sharingPassword = playersSharingPasswords();
       const answers = db.getAnswers();
 
       const players = users.map((u) => {
@@ -23,6 +41,8 @@ export class AdminController {
           displayName: u.displayName,
           isActive: u.isActive !== false,
           isConnected: connectedSet.has(u.id),
+          // Another account has the same password, so either team can sign in as the other.
+          sharesPassword: sharingPassword.has(u.id),
           score,
           correctAnswers: correctCount,
           questionsAnswered: playerAnswers.length,
@@ -78,15 +98,17 @@ export class AdminController {
     }
   }
 
+  /**
+   * Creates player01..playerNN, each with its own generated password. There is no
+   * shared default: with one, any team could sign into another team's seat before that
+   * team arrived, and the one-machine rule would then lock the real team out.
+   */
   public static async bulkCreatePlayers(req: Request, res: Response) {
     try {
-      const { count, prefix = 'player', defaultPassword = 'quiz123' } = req.body;
+      const { count, prefix = 'player' } = req.body;
       const num = Math.min(100, Math.max(1, parseInt(count) || 10));
 
-      const salt = await bcrypt.genSalt(10);
-      const passwordHash = await bcrypt.hash(defaultPassword, salt);
-
-      const createdList: any[] = [];
+      const credentials: IssuedCredential[] = [];
       const currentUsers = db.getUsers();
 
       for (let i = 1; i <= num; i++) {
@@ -94,29 +116,51 @@ export class AdminController {
         const username = `${prefix}${padIndex}`;
 
         if (!currentUsers.some((u) => u.username.toLowerCase() === username.toLowerCase())) {
+          const password = generatePlayerPassword();
           const user = db.addUser({
             username,
             displayName: `Player ${padIndex}`,
-            passwordHash,
+            passwordHash: await hashPassword(password),
             role: 'PLAYER',
             isActive: true,
           });
-          createdList.push({
-            id: user.id,
-            username: user.username,
-            displayName: user.displayName,
-          });
+          credentials.push({ playerId: user.id, username: user.username, displayName: user.displayName, password });
         }
       }
 
       return res.json({
-        message: `Successfully created ${createdList.length} players`,
-        players: createdList,
-        defaultPassword,
+        message: `Successfully created ${credentials.length} players`,
+        credentials,
       });
     } catch (err) {
       console.error('Bulk player create error:', err);
       return res.status(500).json({ error: 'Failed to bulk create players' });
+    }
+  }
+
+  /**
+   * Replaces the passwords of the given players (all players when none are named) with
+   * freshly generated ones and returns them once, for printing. Sessions already signed
+   * in are left alone; force sign-out frees a seat that is held by the wrong machine.
+   */
+  public static async reissuePlayerPasswords(req: Request, res: Response) {
+    try {
+      const { playerIds } = req.body || {};
+      const players = db
+        .getUsers()
+        .filter((u) => u.role === 'PLAYER')
+        .filter((u) => !Array.isArray(playerIds) || playerIds.includes(u.id))
+        // Sheet order: the handout is read top to bottom by username.
+        .sort((a, b) => a.username.localeCompare(b.username, undefined, { numeric: true }));
+
+      const credentials = await issueNewPasswords(players);
+      return res.json({
+        message: `Issued new passwords to ${credentials.length} players`,
+        credentials,
+      });
+    } catch (err) {
+      console.error('Password re-issue error:', err);
+      return res.status(500).json({ error: 'Failed to issue new passwords' });
     }
   }
 
@@ -129,7 +173,7 @@ export class AdminController {
       // session id invalidates its token, and the sockets are dropped so the seat frees.
       if (forceSignOut) {
         db.updateUser(id, { activeSessionId: null });
-        quizEngine.forceDisconnectPlayer(id);
+        quizEngine.disconnectUser(id);
       }
 
       const updates: any = {};
@@ -247,10 +291,12 @@ export class AdminController {
   public static async deleteRound(req: Request, res: Response) {
     try {
       const { id } = req.params;
+      const images = db.getQuestions(id).flatMap((q) => [q.imageUrl, q.afterImageUrl]);
       const removed = db.deleteRound(id);
       if (!removed) {
         return res.status(404).json({ error: 'Round not found' });
       }
+      releaseUnreferencedImages(images);
       return res.json({ message: 'Round and associated questions deleted', id });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to delete round' });
@@ -259,15 +305,16 @@ export class AdminController {
 
   public static async setActiveRound(req: Request, res: Response) {
     try {
-      const { roundId } = req.body;
+      const { roundId, endLiveQuestion } = req.body;
       if (!roundId) {
         return res.status(400).json({ error: 'roundId is required' });
       }
 
-      const session = quizEngine.setActiveRound(roundId);
+      const session = quizEngine.setActiveRound(roundId, { endLiveQuestion: endLiveQuestion === true });
       return res.json({ message: 'Active round updated', session });
     } catch (err: any) {
-      return res.status(400).json({ error: err.message || 'Failed to set active round' });
+      const status = err instanceof LiveQuestionConflictError ? 409 : 400;
+      return res.status(status).json({ error: err.message || 'Failed to set active round' });
     }
   }
 
@@ -342,10 +389,14 @@ export class AdminController {
       if (imageUrl !== undefined) updates.imageUrl = (imageUrl || '').trim();
       if (afterImageUrl !== undefined) updates.afterImageUrl = (afterImageUrl || '').trim();
 
+      const previous = db.getQuestionById(id);
+      const previousImages = previous ? [previous.imageUrl, previous.afterImageUrl] : [];
       const updated = db.updateQuestion(id, updates);
       if (!updated) {
         return res.status(404).json({ error: 'Question not found' });
       }
+      // An image replaced or removed by this edit is deleted unless another question uses it.
+      releaseUnreferencedImages(previousImages);
 
       return res.json({ question: updated });
     } catch (err) {
@@ -360,6 +411,7 @@ export class AdminController {
       if (!removed) {
         return res.status(404).json({ error: 'Question not found' });
       }
+      releaseUnreferencedImages([removed.imageUrl, removed.afterImageUrl]);
       return res.json({ message: 'Question deleted', id });
     } catch (err) {
       return res.status(500).json({ error: 'Failed to delete question' });

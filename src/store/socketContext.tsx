@@ -134,8 +134,12 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       }
 
       setQuizState(state);
+      // The preview is only the top 10: good for a first paint, but it must never
+      // replace full standings once they have arrived, or anyone ranked 11th or lower
+      // drops off their own leaderboard and reads 0 PTS.
       if (state.leaderboardPreview && state.leaderboardPreview.length > 0) {
-        setLeaderboard(state.leaderboardPreview);
+        const preview = state.leaderboardPreview;
+        setLeaderboard((prev) => (prev.length > 0 ? prev : preview));
       }
       // If question changed or ended, reset submission lock if appropriate
       if (state.status === 'WAITING' || state.status === 'ROUND_COMPLETED') {

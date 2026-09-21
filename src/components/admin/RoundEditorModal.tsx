@@ -72,7 +72,7 @@ export const RoundEditorModal: React.FC<RoundEditorModalProps> = ({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
-      <div className="w-full max-w-lg bg-[#0D1322] border-2 border-cyan-500/50 rounded-2xl p-6 relative shadow-[0_0_40px_rgba(0,229,255,0.2)]">
+      <div className="w-full max-w-lg max-h-full overflow-y-auto bg-[#0D1322] border-2 border-cyan-500/50 rounded-2xl p-6 relative shadow-[0_0_40px_rgba(0,229,255,0.2)]">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"

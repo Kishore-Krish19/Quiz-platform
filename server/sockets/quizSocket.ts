@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { verifyToken, isSessionCurrent } from '../middleware/auth';
+import { authenticate } from '../middleware/auth';
 import { quizEngine } from '../services/quizEngine';
 import { ScoringService } from '../services/scoringService';
 import { db } from '../config/db';
@@ -14,17 +14,15 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
       return next(new Error('Authentication token required for WebSocket connection'));
     }
 
-    const user = verifyToken(token);
-    if (!user) {
-      return next(new Error('Invalid or expired authentication token'));
+    // Same check as the REST API: a signature alone is not enough, the token must also
+    // match a real account as stored now. Only a genuine admin may join the 'admins'
+    // room, which receives the live answer key.
+    const outcome = authenticate(token);
+    if ('error' in outcome) {
+      return next(new Error(outcome.error));
     }
 
-    if (!isSessionCurrent(user)) {
-      return next(new Error('This account has been signed in on another device'));
-    }
-
-    // Attach user to socket data
-    socket.data.user = user;
+    socket.data.user = outcome.user;
     next();
   });
 
@@ -115,6 +113,9 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     // Send immediate sync to connecting client
     const isAdmin = user.role === 'ADMIN';
     socket.emit('quiz:state', quizEngine.getCurrentState(isAdmin));
+    // quiz:state carries only a top-10 preview; send the full standings as well, or a
+    // player ranked 11th or lower reads "0 PTS, rank —" until the next state change.
+    socket.emit('quiz:leaderboard_updated', quizEngine.getPublicLeaderboard());
 
     // Replay this player's own answer for the question in play, so a reload or a
     // dropped connection mid-question does not strand them without their result.
@@ -135,6 +136,7 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     // Sync request
     socket.on('quiz:request_sync', () => {
       socket.emit('quiz:state', quizEngine.getCurrentState(user.role === 'ADMIN'));
+      socket.emit('quiz:leaderboard_updated', quizEngine.getPublicLeaderboard());
       restorePlayerAnswer();
     });
 
@@ -170,7 +172,7 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     socket.on('admin:start_round', (data) => {
       if (user.role !== 'ADMIN') return;
       try {
-        quizEngine.setActiveRound(data.roundId);
+        quizEngine.setActiveRound(data.roundId, { endLiveQuestion: data.endLiveQuestion === true });
       } catch (err: any) {
         socket.emit('system:error', err.message);
       }

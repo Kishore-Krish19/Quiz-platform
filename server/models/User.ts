@@ -8,6 +8,8 @@ export interface IUserDocument extends Document {
   role: 'ADMIN' | 'PLAYER';
   isActive: boolean;
   activeSessionId?: string | null;
+  securityStamp?: string | null;
+  envPasswordHash?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -22,12 +24,18 @@ const UserSchema = new Schema<IUserDocument>(
     isActive: { type: Boolean, default: true },
     // Identifies the one sign-in currently allowed to use this player account.
     activeSessionId: { type: String, default: null },
+    // Admins: replaced on every password change; admin tokens must carry the current one.
+    securityStamp: { type: String, default: null },
+    // Admins: hash of the ADMIN_PASSWORD value last applied from .env (see seedService).
+    envPasswordHash: { type: String, default: null },
   },
   {
     timestamps: true,
     toJSON: {
       transform: (_, ret) => {
         delete (ret as any).passwordHash;
+        delete (ret as any).securityStamp;
+        delete (ret as any).envPasswordHash;
         delete (ret as any)._id;
         delete (ret as any).__v;
         return ret;

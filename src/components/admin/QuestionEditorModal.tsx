@@ -218,8 +218,11 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
   const letters = ['A', 'B', 'C', 'D', 'E', 'F'];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md overflow-y-auto">
-      <div className="w-full max-w-2xl bg-[#0D1322] border-2 border-cyan-500/50 rounded-2xl p-6 relative my-8 shadow-[0_0_40px_rgba(0,229,255,0.2)]">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+      {/* Never taller than the screen. A centred box that overflows spills past the top of
+          the page, out of scroll reach, so instead the title and the Save/Cancel buttons
+          stay put and only the fields between them scroll. */}
+      <div className="w-full max-w-2xl max-h-full flex flex-col bg-[#0D1322] border-2 border-cyan-500/50 rounded-2xl relative shadow-[0_0_40px_rgba(0,229,255,0.2)]">
         <button
           onClick={onClose}
           className="absolute top-4 right-4 text-slate-400 hover:text-white transition-colors"
@@ -227,183 +230,187 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
           <X className="w-5 h-5" />
         </button>
 
-        <h3 className="font-display font-bold text-2xl text-white tracking-wide mb-6 flex items-center gap-2">
-          <Zap className="w-6 h-6 text-cyan-400" />
-          {question ? 'Edit Quiz Question' : 'Add New Technical MCQ Question'}
-        </h3>
+        <div className="shrink-0 px-6 pt-6 pb-4">
+          <h3 className="font-display font-bold text-2xl text-white tracking-wide flex items-center gap-2 pr-8">
+            <Zap className="w-6 h-6 text-cyan-400" />
+            {question ? 'Edit Quiz Question' : 'Add New Technical MCQ Question'}
+          </h3>
 
-        {error && (
-          <div className="mb-4 p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 font-mono-tech text-xs">
-            {error}
-          </div>
-        )}
+          {error && (
+            <div className="mt-4 p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 font-mono-tech text-xs">
+              {error}
+            </div>
+          )}
+        </div>
 
-        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-          {/* Question Image */}
-          <ImageField
-            label="Question Image (Optional)"
-            hint="Shown above the question text on every player screen."
-            value={imageUrl}
-            onChange={setImageUrl}
-          />
-
-          {/* Question Text */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
-              Question Statement *
-            </label>
-            <textarea
-              rows={3}
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              placeholder="e.g. In the OSI model, at which layer does TLS operate?"
-              className="w-full p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-colors"
-              required
+        <form onSubmit={handleSubmit} className="flex flex-col min-h-0">
+          <div className="flex flex-col gap-5 min-h-0 overflow-y-auto px-6 pb-4">
+            {/* Question Image */}
+            <ImageField
+              label="Question Image (Optional)"
+              hint="Shown above the question text on every player screen."
+              value={imageUrl}
+              onChange={setImageUrl}
             />
-          </div>
 
-          {/* Options List */}
-          <div className="flex flex-col gap-2.5">
-            <div className="flex items-center justify-between">
+            {/* Question Text */}
+            <div className="flex flex-col gap-1.5">
               <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
-                Options & Correct Answer Selection *
+                Question Statement *
               </label>
-              {options.length < 6 && (
-                <button
-                  type="button"
-                  onClick={handleAddOption}
-                  className="flex items-center gap-1 font-mono-tech text-xs font-bold text-cyan-400 hover:text-cyan-300"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>Add Option</span>
-                </button>
-              )}
-            </div>
-
-            <div className="flex flex-col gap-2.5">
-              {options.map((opt, idx) => {
-                const isSelectedCorrect = correctOptionId === opt.id;
-                return (
-                  <div
-                    key={opt.id}
-                    className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${
-                      isSelectedCorrect
-                        ? 'bg-emerald-950/30 border-emerald-500'
-                        : 'bg-[#070B14] border-[#1F2E4A]'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setCorrectOptionId(opt.id)}
-                      className={`flex items-center justify-center w-8 h-8 rounded-lg font-display font-black text-sm transition-all ${
-                        isSelectedCorrect
-                          ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(52,211,153,0.5)]'
-                          : 'bg-[#162136] text-slate-400 hover:text-white'
-                      }`}
-                      title="Click to mark as correct answer"
-                    >
-                      {letters[idx]}
-                    </button>
-
-                    <input
-                      type="text"
-                      value={opt.text}
-                      onChange={(e) => handleOptionChange(idx, e.target.value)}
-                      placeholder={`Option ${letters[idx]} text...`}
-                      className="flex-1 bg-transparent px-2 py-1 text-sm text-white placeholder-slate-600 outline-none"
-                      required
-                    />
-
-                    <button
-                      type="button"
-                      onClick={() => setCorrectOptionId(opt.id)}
-                      className={`px-2.5 py-1 rounded text-[11px] font-mono-tech font-bold transition-all ${
-                        isSelectedCorrect
-                          ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
-                          : 'text-slate-500 hover:text-slate-300'
-                      }`}
-                    >
-                      {isSelectedCorrect ? '✓ CORRECT' : 'Set Correct'}
-                    </button>
-
-                    {options.length > 2 && (
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveOption(idx)}
-                        className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
-                        title="Remove option"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-
-          {/* Duration & Points */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-cyan-400" />
-                Timer Duration (Seconds)
-              </label>
-              <select
-                value={duration}
-                onChange={(e) => setDuration(Number(e.target.value))}
-                className="w-full p-2.5 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white text-sm outline-none font-mono-tech font-semibold"
-              >
-                <option value={5}>5 seconds (Lightning)</option>
-                <option value={10}>10 seconds (Standard)</option>
-                <option value={15}>15 seconds</option>
-                <option value={20}>20 seconds</option>
-                <option value={30}>30 seconds</option>
-                <option value={60}>60 seconds (Complex)</option>
-              </select>
-            </div>
-
-            <div className="flex flex-col gap-1.5">
-              <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
-                <Zap className="w-3.5 h-3.5 text-yellow-400" />
-                Base Points
-              </label>
-              <input
-                type="number"
-                min={100}
-                max={10000}
-                step={100}
-                value={points}
-                onChange={(e) => setPoints(Number(e.target.value))}
-                className="w-full p-2.5 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-yellow-400 font-display font-black text-sm outline-none"
+              <textarea
+                rows={3}
+                value={text}
+                onChange={(e) => setText(e.target.value)}
+                placeholder="e.g. In the OSI model, at which layer does TLS operate?"
+                className="w-full p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-colors"
+                required
               />
             </div>
-          </div>
 
-          {/* Explanation */}
-          <div className="flex flex-col gap-1.5">
-            <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
-              Explanation (Revealed after question)
-            </label>
-            <textarea
-              rows={2}
-              value={explanation}
-              onChange={(e) => setExplanation(e.target.value)}
-              placeholder="Explain why the answer is correct for the competitors..."
-              className="w-full p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-colors"
+            {/* Options List */}
+            <div className="flex flex-col gap-2.5">
+              <div className="flex items-center justify-between">
+                <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
+                  Options & Correct Answer Selection *
+                </label>
+                {options.length < 6 && (
+                  <button
+                    type="button"
+                    onClick={handleAddOption}
+                    className="flex items-center gap-1 font-mono-tech text-xs font-bold text-cyan-400 hover:text-cyan-300"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Add Option</span>
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-col gap-2.5">
+                {options.map((opt, idx) => {
+                  const isSelectedCorrect = correctOptionId === opt.id;
+                  return (
+                    <div
+                      key={opt.id}
+                      className={`flex items-center gap-2.5 p-2 rounded-xl border transition-all ${
+                        isSelectedCorrect
+                          ? 'bg-emerald-950/30 border-emerald-500'
+                          : 'bg-[#070B14] border-[#1F2E4A]'
+                      }`}
+                    >
+                      <button
+                        type="button"
+                        onClick={() => setCorrectOptionId(opt.id)}
+                        className={`flex items-center justify-center w-8 h-8 rounded-lg font-display font-black text-sm transition-all ${
+                          isSelectedCorrect
+                            ? 'bg-emerald-500 text-black shadow-[0_0_10px_rgba(52,211,153,0.5)]'
+                            : 'bg-[#162136] text-slate-400 hover:text-white'
+                        }`}
+                        title="Click to mark as correct answer"
+                      >
+                        {letters[idx]}
+                      </button>
+
+                      <input
+                        type="text"
+                        value={opt.text}
+                        onChange={(e) => handleOptionChange(idx, e.target.value)}
+                        placeholder={`Option ${letters[idx]} text...`}
+                        className="flex-1 bg-transparent px-2 py-1 text-sm text-white placeholder-slate-600 outline-none"
+                        required
+                      />
+
+                      <button
+                        type="button"
+                        onClick={() => setCorrectOptionId(opt.id)}
+                        className={`px-2.5 py-1 rounded text-[11px] font-mono-tech font-bold transition-all ${
+                          isSelectedCorrect
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/50'
+                            : 'text-slate-500 hover:text-slate-300'
+                        }`}
+                      >
+                        {isSelectedCorrect ? '✓ CORRECT' : 'Set Correct'}
+                      </button>
+
+                      {options.length > 2 && (
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveOption(idx)}
+                          className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+                          title="Remove option"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Duration & Points */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
+                  <Clock className="w-3.5 h-3.5 text-cyan-400" />
+                  Timer Duration (Seconds)
+                </label>
+                <select
+                  value={duration}
+                  onChange={(e) => setDuration(Number(e.target.value))}
+                  className="w-full p-2.5 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white text-sm outline-none font-mono-tech font-semibold"
+                >
+                  <option value={5}>5 seconds (Lightning)</option>
+                  <option value={10}>10 seconds (Standard)</option>
+                  <option value={15}>15 seconds</option>
+                  <option value={20}>20 seconds</option>
+                  <option value={30}>30 seconds</option>
+                  <option value={60}>60 seconds (Complex)</option>
+                </select>
+              </div>
+
+              <div className="flex flex-col gap-1.5">
+                <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
+                  <Zap className="w-3.5 h-3.5 text-yellow-400" />
+                  Base Points
+                </label>
+                <input
+                  type="number"
+                  min={100}
+                  max={10000}
+                  step={100}
+                  value={points}
+                  onChange={(e) => setPoints(Number(e.target.value))}
+                  className="w-full p-2.5 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-yellow-400 font-display font-black text-sm outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Explanation */}
+            <div className="flex flex-col gap-1.5">
+              <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
+                Explanation (Revealed after question)
+              </label>
+              <textarea
+                rows={2}
+                value={explanation}
+                onChange={(e) => setExplanation(e.target.value)}
+                placeholder="Explain why the answer is correct for the competitors..."
+                className="w-full p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-colors"
+              />
+            </div>
+
+            {/* After-question hold image */}
+            <ImageField
+              label="After-Question Image (Optional)"
+              hint="Held on player screens once this question ends, until you start the next one."
+              value={afterImageUrl}
+              onChange={setAfterImageUrl}
             />
           </div>
 
-          {/* After-question hold image */}
-          <ImageField
-            label="After-Question Image (Optional)"
-            hint="Held on player screens once this question ends, until you start the next one."
-            value={afterImageUrl}
-            onChange={setAfterImageUrl}
-          />
-
-          {/* Action buttons */}
-          <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#1F2E4A]">
+          {/* Action buttons — outside the scrolling area, so always on screen */}
+          <div className="shrink-0 flex items-center justify-end gap-3 px-6 py-4 border-t border-[#1F2E4A]">
             <button
               type="button"
               onClick={onClose}

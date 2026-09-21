@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ShieldCheck, Lock, User as UserIcon, ArrowLeft, KeyRound, Sparkles } from 'lucide-react';
+import { ShieldCheck, Lock, User as UserIcon, ArrowLeft } from 'lucide-react';
 import { GadgetLogo } from '../components/common/GadgetLogo';
 import { RobotMascot } from '../components/common/RobotMascot';
 import { ConnectionIndicator } from '../components/common/ConnectionIndicator';
@@ -12,7 +12,7 @@ interface AdminLoginPageProps {
 
 export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onBack }) => {
   const { login } = useAuth();
-  const [username, setUsername] = useState('admin');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -35,12 +35,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onBack }) => {
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const handleQuickFillDev = () => {
-    setUsername('admin');
-    setPassword('Admin@123');
-    setError(null);
   };
 
   return (
@@ -144,19 +138,6 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onBack }) => {
               {isLoading ? 'AUTHENTICATING...' : 'ENTER COMMAND CENTER'}
             </button>
           </form>
-
-          {/* Quick Dev Credential Helper Badge */}
-          <div className="mt-6 pt-4 border-t border-[#1F2E4A] flex items-center justify-between text-xs font-mono-tech">
-            <span className="text-slate-500">Development Seed:</span>
-            <button
-              type="button"
-              onClick={handleQuickFillDev}
-              className="flex items-center gap-1 text-cyan-400 hover:text-cyan-300 font-bold underline cursor-pointer"
-            >
-              <KeyRound className="w-3.5 h-3.5" />
-              <span>Fill Default (admin / Admin@123)</span>
-            </button>
-          </div>
         </div>
       </main>
 

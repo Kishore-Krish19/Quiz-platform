@@ -10,6 +10,14 @@ import {
 import { db } from '../config/db';
 import { ScoringService } from './scoringService';
 
+/** The request would disrupt a question that players are answering right now. */
+export class LiveQuestionConflictError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'LiveQuestionConflictError';
+  }
+}
+
 export class QuizEngine {
   private static instance: QuizEngine;
   private timerHandle: NodeJS.Timeout | null = null;
@@ -59,7 +67,7 @@ export class QuizEngine {
     const session = db.getQuizSession();
     const round = session?.activeRoundId ? db.getRoundById(session.activeRoundId) : null;
 
-    if (!round) {
+    if (!session || !round) {
       // Either there was never a session, or it names a round that no longer exists.
       // Any stored status is then meaningless bookkeeping from a previous event, so
       // start clean on the first round that is actually available.
@@ -78,9 +86,6 @@ export class QuizEngine {
         questionStartedAt: null,
         questionEndsAt: null,
         duration: fallback ? fallback.defaultDuration || null : null,
-        serverTime: Date.now(),
-        connectedPlayersCount: 0,
-        answeredPlayersCount: 0,
       });
       return;
     }
@@ -159,13 +164,27 @@ export class QuizEngine {
     return this.getConnectedPlayerUserIds().size;
   }
 
+  /**
+   * Full standings as players are allowed to see them: points from a question that is
+   * still live are held back, so nobody can infer the answer from a moving score.
+   */
+  public getPublicLeaderboard(): LeaderboardEntry[] {
+    const session = db.getQuizSession();
+    return ScoringService.calculateLeaderboard(
+      session?.activeRoundId || undefined,
+      this.getConnectedPlayerUserIds(),
+      session?.status === 'QUESTION_ACTIVE' ? session.currentQuestionId || undefined : undefined
+    );
+  }
+
   public isPlayerConnected(userId: string): boolean {
     return this.getConnectedPlayerUserIds().has(userId);
   }
 
   /**
-   * Lets an operator boot a player's sockets — the escape hatch when a machine has
-   * crashed or been left logged in and the account needs to be freed mid-event.
+   * Drops every socket held by one account. For a player it is the escape hatch when a
+   * machine has crashed or been left logged in and the seat needs freeing mid-event; for
+   * an admin it ends the sessions opened with a password that has just been changed.
    * Wired to Socket.IO by the socket layer, which owns the io instance.
    */
   private forceDisconnectHandler: ((userId: string) => void) | null = null;
@@ -174,7 +193,7 @@ export class QuizEngine {
     this.forceDisconnectHandler = cb;
   }
 
-  public forceDisconnectPlayer(userId: string) {
+  public disconnectUser(userId: string) {
     if (this.forceDisconnectHandler) {
       this.forceDisconnectHandler(userId);
     }
@@ -214,6 +233,7 @@ export class QuizEngine {
   public getCurrentState(isAdmin = false): QuizSessionState {
     const session = db.getQuizSession() || {
       status: 'WAITING',
+      lastEndedQuestionId: null,
       activeRoundId: null,
       activeRoundNumber: null,
       activeRoundName: null,
@@ -314,12 +334,28 @@ export class QuizEngine {
   }
 
   /**
-   * Sets or switches active round
+   * Sets or switches the active round.
+   *
+   * Refused while a question is live: switching would pull every player out of it, with
+   * no reveal and no results. With endLiveQuestion the question is first closed the
+   * normal way — answers already in are kept, scored and revealed — and then the round
+   * switches.
    */
-  public setActiveRound(roundId: string) {
+  public setActiveRound(roundId: string, options: { endLiveQuestion?: boolean } = {}) {
     const round = db.getRoundById(roundId);
     if (!round) {
       throw new Error('Round not found');
+    }
+
+    const current = db.getQuizSession();
+    if (current?.status === 'QUESTION_ACTIVE') {
+      if (!options.endLiveQuestion) {
+        throw new LiveQuestionConflictError(
+          `Question ${current.currentQuestionNumber ?? ''} of "${current.activeRoundName ?? 'the active round'}" is live. ` +
+            'End it before switching rounds.'
+        );
+      }
+      this.endCurrentQuestion();
     }
 
     if (this.timerHandle) {
@@ -559,6 +595,14 @@ export class QuizEngine {
    * Resets the active round
    */
   public resetRound(roundId: string) {
+    // Resetting the round in play is a deliberate, confirmed wipe. Resetting another
+    // round must not take down the question that is live in this one — check before
+    // the timer is touched, or a refused reset would leave that question with none.
+    const session = db.getQuizSession();
+    if (session?.status === 'QUESTION_ACTIVE' && session.activeRoundId !== roundId) {
+      throw new LiveQuestionConflictError('A question is live in another round. End it before resetting this one.');
+    }
+
     if (this.timerHandle) {
       clearTimeout(this.timerHandle);
       this.timerHandle = null;

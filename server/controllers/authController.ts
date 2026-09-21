@@ -3,7 +3,9 @@ import bcrypt from 'bcryptjs';
 import crypto from 'crypto';
 import { db } from '../config/db';
 import { generateToken, AuthRequest } from '../middleware/auth';
+import { loginRetryAfterMs, recordLoginFailure } from '../middleware/loginThrottle';
 import { quizEngine } from '../services/quizEngine';
+import { adminPasswordProblem, hashPassword, newSecurityStamp } from '../services/passwordService';
 
 const MAX_DISPLAY_NAME = 40;
 
@@ -37,8 +39,18 @@ export class AuthController {
         return res.status(400).json({ error: 'Username and password are required' });
       }
 
+      const clientIp = req.ip || req.socket.remoteAddress || 'unknown';
+      const retryAfterMs = loginRetryAfterMs(clientIp);
+      if (retryAfterMs > 0) {
+        res.setHeader('Retry-After', Math.ceil(retryAfterMs / 1000));
+        return res.status(429).json({
+          error: `Too many failed sign-in attempts from this machine. Try again in ${Math.ceil(retryAfterMs / 1000)} seconds.`,
+        });
+      }
+
       const user = db.getUserByUsername(username);
       if (!user) {
+        recordLoginFailure(clientIp);
         return res.status(401).json({ error: 'Invalid username or password' });
       }
 
@@ -54,6 +66,7 @@ export class AuthController {
 
       const isMatch = await bcrypt.compare(password, user.passwordHash);
       if (!isMatch) {
+        recordLoginFailure(clientIp);
         return res.status(401).json({ error: 'Invalid username or password' });
       }
 
@@ -83,6 +96,10 @@ export class AuthController {
         sessionId = crypto.randomUUID();
         activeUser =
           db.updateUser(user.id, { displayName: requestedName, activeSessionId: sessionId }) || user;
+      } else if (!user.securityStamp) {
+        // Admin tokens are bound to the account's security stamp; accounts from before
+        // stamps existed get one on first sign-in.
+        activeUser = db.updateUser(user.id, { securityStamp: newSecurityStamp() }) || user;
       }
 
       // Generated after the rename so the token carries the name in play.
@@ -100,6 +117,61 @@ export class AuthController {
     } catch (err) {
       console.error('Login error:', err);
       return res.status(500).json({ error: 'Internal server error during authentication' });
+    }
+  }
+
+  /**
+   * Lets a signed-in admin replace their own password. The security stamp is replaced
+   * with it, which ends every other session opened with the old password — including
+   * open control-panel sockets, which receive the live answer key. The caller gets a
+   * fresh token so their own screen carries on.
+   */
+  public static async changeAdminPassword(req: AuthRequest, res: Response) {
+    try {
+      const { currentPassword, newPassword } = req.body;
+      const account = req.user ? db.getUserById(req.user.id) : undefined;
+      if (!account || account.role !== 'ADMIN') {
+        return res.status(403).json({ error: 'Only an admin can change the admin password' });
+      }
+
+      if (typeof currentPassword !== 'string' || typeof newPassword !== 'string' || !currentPassword || !newPassword) {
+        return res.status(400).json({ error: 'Current and new password are required' });
+      }
+
+      if (!(await bcrypt.compare(currentPassword, account.passwordHash))) {
+        return res.status(401).json({ error: 'The current password is incorrect' });
+      }
+
+      const problem = adminPasswordProblem(newPassword);
+      if (problem) {
+        return res.status(400).json({ error: `The new password ${problem}.` });
+      }
+      if (newPassword === currentPassword) {
+        return res.status(400).json({ error: 'The new password must differ from the current one.' });
+      }
+
+      const updated = db.updateUser(account.id, {
+        passwordHash: await hashPassword(newPassword),
+        securityStamp: newSecurityStamp(),
+      });
+      if (!updated) {
+        return res.status(404).json({ error: 'Admin account not found' });
+      }
+
+      quizEngine.disconnectUser(updated.id);
+
+      return res.json({
+        token: generateToken(updated),
+        user: {
+          id: updated.id,
+          username: updated.username,
+          displayName: updated.displayName,
+          role: updated.role,
+        },
+      });
+    } catch (err) {
+      console.error('Admin password change error:', err);
+      return res.status(500).json({ error: 'Failed to change the admin password' });
     }
   }
 

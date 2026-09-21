@@ -1,32 +1,105 @@
 import bcrypt from 'bcryptjs';
 import { db } from '../config/db';
+import type { NewQuestion, StoredUser } from '../config/db';
+import { StartupConfigError } from '../config/startupError';
+import {
+  MIN_ADMIN_PASSWORD_LENGTH,
+  adminPasswordProblem,
+  generatePlayerPassword,
+  hashPassword,
+  isPublishedPassword,
+  newSecurityStamp,
+  playersSharingPasswords,
+} from './passwordService';
 
-export async function seedInitialData() {
-  const users = db.getUsers();
+const PRIMARY_ADMIN_USERNAME = 'admin';
 
-  // Check if admin already exists
-  const existingAdmin = users.find((u) => u.username === 'admin');
-  if (!existingAdmin) {
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash('Admin@123', salt);
+/**
+ * Makes sure no admin account can be signed into with a published password.
+ *
+ * ADMIN_PASSWORD in .env creates the "admin" account on a fresh install, and whenever it
+ * is given a NEW value it resets that account's password to it — the recovery path if
+ * the password set in the admin console is forgotten. An unchanged value is not
+ * re-applied, so a password changed in the console survives restarts.
+ *
+ * Any admin account still on a published default (the Admin@123 the README once printed) is moved to
+ * ADMIN_PASSWORD. Without one set, the server refuses to start rather than run with a
+ * password every competitor can read.
+ */
+async function ensureAdminCredentials() {
+  const envPassword = process.env.ADMIN_PASSWORD?.trim() ? process.env.ADMIN_PASSWORD : '';
 
+  if (envPassword) {
+    const problem = adminPasswordProblem(envPassword);
+    if (problem) {
+      throw new StartupConfigError(`ADMIN_PASSWORD in .env ${problem}.`, [
+        `Choose a password of at least ${MIN_ADMIN_PASSWORD_LENGTH} characters that is not printed in the README.`,
+      ]);
+    }
+  }
+
+  const primary = db.getUserByUsername(PRIMARY_ADMIN_USERNAME);
+  if (!primary) {
+    if (!envPassword) {
+      throw new StartupConfigError('No admin account exists yet, and ADMIN_PASSWORD is not set.', [
+        `Add ADMIN_PASSWORD=<at least ${MIN_ADMIN_PASSWORD_LENGTH} characters> to .env and start again.`,
+        'It becomes the password of the "admin" account; you can change it later under Settings.',
+      ]);
+    }
+    const passwordHash = await hashPassword(envPassword);
     db.addUser({
-      id: 'admin_root',
-      username: 'admin',
+      id: db.getUserById('admin_root') ? undefined : 'admin_root',
+      username: PRIMARY_ADMIN_USERNAME,
       displayName: 'System Admin',
       passwordHash,
+      envPasswordHash: passwordHash,
+      securityStamp: newSecurityStamp(),
       role: 'ADMIN',
       isActive: true,
     });
-    console.log('✅ Seeded default Admin user (username: admin, password: Admin@123)');
+    console.log(`✅ Created the "${PRIMARY_ADMIN_USERNAME}" admin account with ADMIN_PASSWORD from .env`);
+  } else if (
+    envPassword &&
+    primary.role === 'ADMIN' &&
+    !(primary.envPasswordHash && (await bcrypt.compare(envPassword, primary.envPasswordHash)))
+  ) {
+    const passwordHash = await hashPassword(envPassword);
+    db.updateUser(primary.id, { passwordHash, envPasswordHash: passwordHash, securityStamp: newSecurityStamp() });
+    console.log(`🔑 Applied ADMIN_PASSWORD from .env to the "${PRIMARY_ADMIN_USERNAME}" admin account`);
   }
 
-  // Seed sample players if none exist
+  const onPublishedPassword: StoredUser[] = [];
+  for (const admin of db.getUsers().filter((u) => u.role === 'ADMIN')) {
+    if (await isPublishedPassword(admin.passwordHash)) onPublishedPassword.push(admin);
+  }
+  if (onPublishedPassword.length === 0) return;
+
+  const names = onPublishedPassword.map((a) => `"${a.username}"`).join(', ');
+  const accounts = onPublishedPassword.length === 1 ? `Admin account ${names} still uses` : `Admin accounts ${names} still use`;
+  if (!envPassword) {
+    throw new StartupConfigError(`${accounts} a published default password.`, [
+      'Anyone who has read the README can sign in as admin and see every answer.',
+      `Add ADMIN_PASSWORD=<at least ${MIN_ADMIN_PASSWORD_LENGTH} characters> to .env and start again;`,
+      'it replaces the published password on those accounts.',
+    ]);
+  }
+
+  const passwordHash = await hashPassword(envPassword);
+  for (const admin of onPublishedPassword) {
+    db.updateUser(admin.id, { passwordHash, securityStamp: newSecurityStamp() });
+  }
+  console.log(`🔑 Replaced the published default password on admin account ${names} with ADMIN_PASSWORD`);
+}
+
+export async function seedInitialData() {
+  await ensureAdminCredentials();
+
+  const users = db.getUsers();
+
+  // Seed sample players if none exist — each with a password of its own. A shared one
+  // lets any team sign into another team's seat before that team arrives.
   const existingPlayers = users.filter((u) => u.role === 'PLAYER');
   if (existingPlayers.length === 0) {
-    const salt = await bcrypt.genSalt(10);
-    const playerHash = await bcrypt.hash('player123', salt);
-
     const initialPlayers = [
       { username: 'player01', displayName: 'ByteBandits (Lab 01)' },
       { username: 'player02', displayName: 'CyberKnights (Lab 02)' },
@@ -40,16 +113,29 @@ export async function seedInitialData() {
       { username: 'player10', displayName: 'DevDynasty (Lab 10)' },
     ];
 
+    const issued: { username: string; password: string }[] = [];
     for (const p of initialPlayers) {
+      const password = generatePlayerPassword();
       db.addUser({
         username: p.username,
         displayName: p.displayName,
-        passwordHash: playerHash,
+        passwordHash: await hashPassword(password),
         role: 'PLAYER',
         isActive: true,
       });
+      issued.push({ username: p.username, password });
     }
-    console.log('✅ Seeded 10 default player accounts (password: player123)');
+    console.log(`✅ Seeded ${issued.length} player accounts, each with its own password (shown once):`);
+    issued.forEach((c) => console.log(`     ${c.username.padEnd(12)} ${c.password}`));
+    console.log('   Players → ISSUE NEW PASSWORDS in the admin console prints a fresh sheet at any time.');
+  }
+
+  const sharing = playersSharingPasswords();
+  if (sharing.size > 0) {
+    console.warn(
+      `⚠️  ${sharing.size} player accounts share a password with another account, so any of them can sign in ` +
+        `as the others. Open Players → ISSUE NEW PASSWORDS in the admin console before the event.`
+    );
   }
 
   // Seed Round 1 and 10 Technical MCQ Questions if none exist
@@ -75,7 +161,7 @@ export async function seedInitialData() {
 
   const existingQuestions = db.getQuestions(round1.id);
   if (existingQuestions.length === 0) {
-    const technicalQuestions = [
+    const technicalQuestions: Omit<NewQuestion, 'roundId'>[] = [
       {
         order: 1,
         text: 'In the OSI model, at which layer does the Transport Layer Security (TLS/SSL) protocol primarily operate?',

@@ -21,7 +21,7 @@ export const AdminLeaderboardPage: React.FC = () => {
   const handleExportCSV = async () => {
     try {
       setIsExporting(true);
-      await api.exportLeaderboardCSV(quizState?.activeRoundId);
+      await api.exportLeaderboardCSV(quizState?.activeRoundId ?? undefined);
     } catch (err) {
       console.error('Export CSV failed:', err);
     } finally {

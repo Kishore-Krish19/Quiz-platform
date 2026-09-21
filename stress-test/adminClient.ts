@@ -4,6 +4,12 @@ export class AdminClient {
   private token: string | null = null;
 
   public async login(): Promise<string> {
+    if (!STRESS_CONFIG.ADMIN_USER.password) {
+      throw new Error(
+        'No admin password: set ADMIN_PASSWORD in .env (or the environment) to the current admin password.'
+      );
+    }
+
     const res = await fetch(`${STRESS_CONFIG.BASE_URL}/api/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,10 +103,12 @@ export class AdminClient {
   }
 
   public async setActiveRound(roundId: string) {
+    // The harness switches rounds deliberately, even over a question a previous
+    // scenario left live — so it asks for that question to be closed first.
     const res = await fetch(`${STRESS_CONFIG.BASE_URL}/api/admin/rounds/set-active`, {
       method: 'POST',
       headers: this.authHeaders(),
-      body: JSON.stringify({ roundId }),
+      body: JSON.stringify({ roundId, endLiveQuestion: true }),
     });
     return await res.json();
   }

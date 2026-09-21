@@ -1,6 +1,7 @@
 import {
   AnswerResult,
   EventSettings,
+  IssuedCredential,
   LeaderboardEntry,
   Question,
   QuizSessionState,
@@ -48,6 +49,16 @@ export const api = {
       headers: getAuthHeaders(),
     });
     return handleResponse<{ user: User }>(res);
+  },
+
+  // Signs out every other admin session; the response carries this screen's new token.
+  async changeAdminPassword(currentPassword: string, newPassword: string) {
+    const res = await fetch(`${API_BASE}/auth/change-password`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ currentPassword, newPassword }),
+    });
+    return handleResponse<{ token: string; user: User }>(res);
   },
 
   // Quiz Public / Player
@@ -138,6 +149,7 @@ export const api = {
         correctAnswers: number;
         questionsAnswered: number;
         isConnected: boolean;
+        sharesPassword: boolean;
       })[];
     }>(res);
   },
@@ -151,13 +163,24 @@ export const api = {
     return handleResponse<{ player: User }>(res);
   },
 
-  async bulkCreatePlayers(count: number, prefix = 'player', defaultPassword = 'quiz123') {
+  // Every created player gets a generated password of its own, returned this once.
+  async bulkCreatePlayers(count: number, prefix = 'player') {
     const res = await fetch(`${API_BASE}/admin/players/bulk`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ count, prefix, defaultPassword }),
+      body: JSON.stringify({ count, prefix }),
     });
-    return handleResponse<{ message: string; players: User[]; defaultPassword: string }>(res);
+    return handleResponse<{ message: string; credentials: IssuedCredential[] }>(res);
+  },
+
+  // Omit playerIds to re-issue for every player.
+  async reissuePlayerPasswords(playerIds?: string[]) {
+    const res = await fetch(`${API_BASE}/admin/players/reissue-passwords`, {
+      method: 'POST',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ playerIds }),
+    });
+    return handleResponse<{ message: string; credentials: IssuedCredential[] }>(res);
   },
 
   async updatePlayer(id: string, updates: any) {
@@ -220,11 +243,13 @@ export const api = {
     return handleResponse<{ message: string; id: string }>(res);
   },
 
-  async setActiveRound(roundId: string) {
+  // The server refuses (409) while a question is live unless endLiveQuestion is set,
+  // which closes that question normally — answers kept and revealed — before switching.
+  async setActiveRound(roundId: string, endLiveQuestion = false) {
     const res = await fetch(`${API_BASE}/admin/rounds/set-active`, {
       method: 'POST',
       headers: getAuthHeaders(),
-      body: JSON.stringify({ roundId }),
+      body: JSON.stringify({ roundId, endLiveQuestion }),
     });
     return handleResponse<any>(res);
   },

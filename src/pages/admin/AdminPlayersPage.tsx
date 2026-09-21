@@ -10,12 +10,16 @@ import {
   XCircle,
   Wifi,
   WifiOff,
+  AlertTriangle,
+  RefreshCw,
 } from 'lucide-react';
 import { api } from '../../services/api';
-import { User } from '../../types';
+import { IssuedCredential, User } from '../../types';
 import { AddPlayerModal } from '../../components/admin/AddPlayerModal';
+import { CredentialSheet } from '../../components/admin/CredentialSheet';
 import { ConfirmDialog } from '../../components/common/ConfirmDialog';
 import { LoadingSpinner } from '../../components/common/LoadingSpinner';
+import { generatePlayerPassword } from '../../utils/passwords';
 
 export const AdminPlayersPage: React.FC = () => {
   const [players, setPlayers] = useState<any[]>([]);
@@ -26,7 +30,12 @@ export const AdminPlayersPage: React.FC = () => {
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
   const [editPlayer, setEditPlayer] = useState<any | null>(null);
   const [resetPassId, setResetPassId] = useState<string | null>(null);
-  const [newPassword, setNewPassword] = useState('quiz123');
+  const [newPassword, setNewPassword] = useState('');
+  const [signOutOnReset, setSignOutOnReset] = useState(true);
+  const [isReissueConfirmOpen, setIsReissueConfirmOpen] = useState(false);
+  const [isReissuing, setIsReissuing] = useState(false);
+  const [issuedCredentials, setIssuedCredentials] = useState<IssuedCredential[] | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadPlayers = async () => {
     try {
@@ -55,16 +64,39 @@ export const AdminPlayersPage: React.FC = () => {
     }
   };
 
+  const openResetPassword = (playerId: string, isConnected: boolean) => {
+    setResetPassId(playerId);
+    setNewPassword(generatePlayerPassword());
+    // A reset mid-event is usually because the seat is held by the wrong machine.
+    setSignOutOnReset(isConnected);
+  };
+
   const handleResetPassword = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!resetPassId || !newPassword) return;
     try {
-      await api.updatePlayer(resetPassId, { password: newPassword });
+      setActionError(null);
+      await api.updatePlayer(resetPassId, { password: newPassword, forceSignOut: signOutOnReset });
       setResetPassId(null);
-      setNewPassword('quiz123');
+      setNewPassword('');
       loadPlayers();
-    } catch (err) {
-      console.error('Password reset failed:', err);
+    } catch (err: any) {
+      setActionError(err.message || 'Password reset failed');
+    }
+  };
+
+  const handleReissueAll = async () => {
+    setIsReissueConfirmOpen(false);
+    try {
+      setIsReissuing(true);
+      setActionError(null);
+      const res = await api.reissuePlayerPasswords();
+      setIssuedCredentials(res.credentials);
+      loadPlayers();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to issue new passwords');
+    } finally {
+      setIsReissuing(false);
     }
   };
 
@@ -97,6 +129,7 @@ export const AdminPlayersPage: React.FC = () => {
   });
 
   const onlineCount = players.filter((p) => p.isConnected).length;
+  const sharingCount = players.filter((p) => p.sharesPassword).length;
 
   return (
     <div className="flex flex-col gap-6 select-none animate-fade-in">
@@ -112,14 +145,49 @@ export const AdminPlayersPage: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => setIsAddModalOpen(true)}
-          className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wide shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 cursor-pointer"
-        >
-          <UserPlus className="w-4 h-4" />
-          <span>ADD / BULK GENERATE</span>
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsReissueConfirmOpen(true)}
+            disabled={isReissuing || players.length === 0}
+            className="px-4 py-2.5 rounded-xl bg-[#162136] hover:bg-yellow-500/20 text-yellow-300 border border-yellow-500/40 font-display font-black text-sm tracking-wide flex items-center gap-2 cursor-pointer disabled:opacity-40"
+            title="Give every player a new password of its own and print the sheet"
+          >
+            <RefreshCw className={`w-4 h-4 ${isReissuing ? 'animate-spin' : ''}`} />
+            <span>{isReissuing ? 'ISSUING...' : 'ISSUE NEW PASSWORDS'}</span>
+          </button>
+          <button
+            onClick={() => setIsAddModalOpen(true)}
+            className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wide shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 cursor-pointer"
+          >
+            <UserPlus className="w-4 h-4" />
+            <span>ADD / BULK GENERATE</span>
+          </button>
+        </div>
       </div>
+
+      {sharingCount > 0 && (
+        <div className="p-4 rounded-2xl bg-red-500/10 border border-red-500/50 flex flex-col sm:flex-row sm:items-center gap-3">
+          <AlertTriangle className="w-6 h-6 text-red-400 shrink-0" />
+          <p className="flex-1 text-sm text-red-200 font-medium">
+            <strong className="text-white">{sharingCount} player accounts share a password</strong> with another
+            account, so a team can sign into another team's seat before they arrive — and the one-machine rule then
+            locks the real team out. Issue new passwords before the event.
+          </p>
+          <button
+            onClick={() => setIsReissueConfirmOpen(true)}
+            disabled={isReissuing}
+            className="px-4 py-2 rounded-xl bg-red-500 hover:bg-red-400 text-white font-bold text-xs whitespace-nowrap disabled:opacity-50"
+          >
+            ISSUE NEW PASSWORDS
+          </button>
+        </div>
+      )}
+
+      {actionError && (
+        <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 font-mono-tech text-xs">
+          {actionError}
+        </div>
+      )}
 
       {/* Filters & Search */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-[#0D1322] border border-[#1F2E4A] rounded-2xl p-4">
@@ -213,6 +281,14 @@ export const AdminPlayersPage: React.FC = () => {
 
                       <td className="py-3 px-4 font-mono-tech font-bold text-white">
                         @{player.username}
+                        {player.sharesPassword && (
+                          <span
+                            className="ml-2 whitespace-nowrap font-mono-tech text-[9px] font-black uppercase px-1.5 py-0.5 rounded bg-red-500/20 text-red-300 border border-red-500/40"
+                            title="Another account has the same password"
+                          >
+                            SHARED PW
+                          </span>
+                        )}
                       </td>
 
                       <td className="py-3 px-4 font-bold text-slate-100">
@@ -248,10 +324,7 @@ export const AdminPlayersPage: React.FC = () => {
                       <td className="py-3 px-4 text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <button
-                            onClick={() => {
-                              setResetPassId(player.id);
-                              setNewPassword('quiz123');
-                            }}
+                            onClick={() => openResetPassword(player.id, player.isConnected)}
                             className="p-1.5 rounded-lg bg-[#162136] hover:bg-yellow-500/20 text-slate-400 hover:text-yellow-300 transition-colors"
                             title="Reset password"
                           >
@@ -308,14 +381,37 @@ export const AdminPlayersPage: React.FC = () => {
                 <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
                   New Password
                 </label>
-                <input
-                  type="text"
-                  value={newPassword}
-                  onChange={(e) => setNewPassword(e.target.value)}
-                  className="p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-white text-sm outline-none font-mono-tech font-bold"
-                  required
-                />
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                    className="flex-1 min-w-0 p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-white text-sm outline-none font-mono-tech font-bold tracking-wider"
+                    required
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setNewPassword(generatePlayerPassword())}
+                    className="p-3 rounded-xl bg-[#162136] hover:bg-slate-700 text-slate-300"
+                    title="Generate another"
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                  </button>
+                </div>
+                <span className="font-mono-tech text-[11px] text-slate-500">
+                  Generated for this account only. Note it down before saving — it cannot be shown again.
+                </span>
               </div>
+
+              <label className="flex items-start gap-2 text-xs text-slate-300 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={signOutOnReset}
+                  onChange={(e) => setSignOutOnReset(e.target.checked)}
+                  className="mt-0.5 accent-yellow-400"
+                />
+                <span>Also sign this account out everywhere, so whoever holds the seat now has to use the new password.</span>
+              </label>
 
               <div className="flex items-center justify-end gap-3 mt-2">
                 <button
@@ -333,6 +429,29 @@ export const AdminPlayersPage: React.FC = () => {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Re-issue every player's password */}
+      <ConfirmDialog
+        isOpen={isReissueConfirmOpen}
+        title="Issue New Passwords?"
+        message={`Every one of the ${players.length} player accounts gets a new password of its own, and its old password stops working. Players already signed in stay signed in. You get a sheet to print or copy — it is shown only once.`}
+        confirmLabel="ISSUE NEW PASSWORDS"
+        variant="warning"
+        onConfirm={handleReissueAll}
+        onCancel={() => setIsReissueConfirmOpen(false)}
+      />
+
+      {issuedCredentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md">
+          <div className="w-full max-w-2xl max-h-full overflow-y-auto bg-[#0D1322] border-2 border-emerald-500/50 rounded-2xl p-6">
+            <h3 className="font-display font-bold text-xl text-white mb-4 flex items-center gap-2">
+              <KeyRound className="w-5 h-5 text-emerald-400" />
+              New Player Passwords ({issuedCredentials.length})
+            </h3>
+            <CredentialSheet credentials={issuedCredentials} onDone={() => setIssuedCredentials(null)} />
           </div>
         </div>
       )}

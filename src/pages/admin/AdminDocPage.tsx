@@ -143,7 +143,7 @@ export const AdminDocPage: React.FC = () => {
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-            <span>Set Count to 40, Prefix to <code>player</code>, and default password to <code>player123</code>.</span>
+            <span>Set Count to 40 and Prefix to <code>player</code>. Each account gets its own generated password — print the slips from the sheet that appears (it is shown only once; <strong>ISSUE NEW PASSWORDS</strong> makes a fresh one).</span>
           </div>
           <div className="flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />

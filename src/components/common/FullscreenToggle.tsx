@@ -25,6 +25,7 @@ export const FullscreenToggle: React.FC<{ className?: string }> = ({ className =
 
   return (
     <button
+      data-fullscreen-toggle
       onClick={toggleFullscreen}
       className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#0D1322] border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/10 hover:border-cyan-400 font-mono-tech text-xs transition-all ${className}`}
       title={isFullscreen ? 'Exit Fullscreen' : 'Enter Fullscreen Mode'}

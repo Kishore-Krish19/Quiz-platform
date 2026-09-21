@@ -17,6 +17,7 @@ Verified and stress-tested to support **40+ simultaneous players** with sub-3ms 
 - **🖼️ Image-Based Questions:** Any question can carry a picture — players see **image → question → options**. Each question can also carry a second image that holds the player screens between questions until the admin starts the next one. Images are uploaded from the admin panel and served from the server, so they work with no internet.
 - **🔒 Simultaneous Answer Reveal:** Nobody learns anything early. Submitting returns a receipt only — correctness, points and standings are all withheld until the timer ends, then released to every screen in the same instant.
 - **🛡️ Race & Exploit Defense:** Prevents double submissions, late submissions beyond deadline, and unauthorized admin event execution.
+- **💾 MongoDB Outage Safety:** If MongoDB drops mid-event the quiz keeps running. Writes are held in order in `data/.mongo-pending.jsonl` (one line each) and saved the moment MongoDB is back — or at the next start, if the server was restarted during the outage.
 - **🔄 Mid-Quiz Reconnection & Resilience:** Automatically restores player identity, score history, their own submitted answer, and active question state upon reconnect — a reload mid-question cannot be used to peek at the answer early.
 - **📊 Admin Control Center:** Full round management, question trigger controls, live answer statistics, CSV exports (matrix & leaderboard), and player management.
 - **🧪 Built-in Stress Testing Suite:** Automated zero-mock load-testing system supporting up to 100 concurrent players.
@@ -41,14 +42,18 @@ Verified and stress-tested to support **40+ simultaneous players** with sub-3ms 
 - **MongoDB Community Server** running locally on port `27017`
 
 ### 2. Environment Configuration
-Copy `.env.example` to `.env`. These values are loaded at start-up (`dotenv/config`, the first import in `server.ts`); with no `.env` present the same values apply as built-in defaults.
+Copy `.env.example` to `.env`. These values are loaded at start-up (`dotenv/config`, the first import in `server.ts`).
 ```env
 PORT=3000
 NODE_ENV=development
-JWT_SECRET=gadget-code-secret-key-2026-super-secure
 MONGODB_URI=mongodb://127.0.0.1:27017/gadget_code
 CLIENT_URL=http://localhost:3000
+JWT_SECRET=
+ADMIN_PASSWORD=<choose one, at least 10 characters>
 ```
+
+- **`ADMIN_PASSWORD`** is required on a fresh install: it becomes the password of the `admin` account. The server refuses to start while any admin account still uses a published default password.
+- **`JWT_SECRET`** should stay empty. On first start the server generates a random secret for this install and keeps it in `data/.jwt-secret` (git-ignored — never share it). If you set one yourself it must be at least 32 random characters; a short or published secret is refused at startup.
 
 ### 3. Install Dependencies & Start Server
 ```bash
@@ -62,16 +67,18 @@ The application will bind to `0.0.0.0:3000` for both local and LAN access:
 
 ---
 
-## 🔑 Default Credentials
+## 🔑 Accounts & Passwords
 
-On initial startup, the platform automatically provisions default administrative and player accounts:
+No password is published anywhere: competitors can read this README too.
 
-- **Admin Portal:**
-  - Username: `admin`
-  - Password: `Admin@123`
-- **Player Accounts (10 Default Players):**
-  - Usernames: `player01` through `player10`
-  - Password: `player123`
+- **Admin (`admin`):** the password is `ADMIN_PASSWORD` from `.env`. Change it any time under **Settings → Admin Account**; that signs out every other admin screen. A password changed there survives restarts. If you forget it, put a *new* value in `ADMIN_PASSWORD` and restart — a changed value resets the `admin` password.
+- **Players:** every account gets its own generated password. A fresh install seeds `player01`–`player10` and prints their passwords once in the server console; the **Bulk Generator** shows a sheet for the accounts it creates. **Players → ISSUE NEW PASSWORDS** replaces every player's password and gives you a sheet to copy, download as CSV, or print as cut-out slips. The Players page warns if any accounts share a password.
+- **Failed sign-ins** are limited to 10 per minute per machine, so passwords cannot be guessed at speed.
+
+### Before the event
+1. Set `ADMIN_PASSWORD` in `.env` and start the server.
+2. Open **Players → ISSUE NEW PASSWORDS**, print the slips, and hand one to each team.
+3. Keep `data/.jwt-secret` private — anyone holding it could sign their own admin token.
 
 ---
 
@@ -90,6 +97,8 @@ Open **Questions → Add / Edit** in the admin panel. Each question has two opti
 - A question without an after-image simply falls back to the usual standby card, and the final question of a round goes straight to the podium.
 
 > **Backups:** `admin/export/backup.json` contains image *URLs*, not the image bytes. When moving an event to another machine, copy the `data/uploads/` folder across alongside the JSON, or the pictures will be missing.
+>
+> **Cleanup:** when an edit replaces or removes a question's image, or a question or round is deleted, the image file is deleted too — unless another question still uses it. An older backup can therefore point at images that no longer exist.
 
 ---
 
@@ -98,6 +107,8 @@ Open **Questions → Add / Edit** in the admin panel. Each question has two opti
 The project includes an automated, zero-mock stress testing environment in `stress-test/` that connects to the real local Express, Socket.IO, and MongoDB instance.
 
 ### Stress Test Commands
+
+The suite signs in as `admin` with `ADMIN_PASSWORD` from `.env` (or the environment). If you have changed the admin password in the console since, pass the current one: `ADMIN_PASSWORD=... npm run stress:40`.
 
 ```bash
 # Display CLI help
@@ -143,7 +154,9 @@ npm run stress:cleanup
 
 ```
 ├── data/                  # Offline fallback data store (when MongoDB unavailable)
-│   └── uploads/           # Admin-uploaded question images (git-ignored, not in JSON backups)
+│   ├── uploads/           # Admin-uploaded question images (git-ignored, not in JSON backups)
+│   ├── .jwt-secret        # Per-install token signing secret (git-ignored, generated on first start)
+│   └── .mongo-pending.jsonl  # Writes held during a MongoDB outage (git-ignored, transient)
 ├── server/
 │   ├── config/            # DB store & MongoDB connection setup
 │   ├── controllers/       # Auth, Admin, Quiz, Export, and Image Upload controllers

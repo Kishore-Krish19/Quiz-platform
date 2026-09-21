@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { AuthRequest } from '../middleware/auth';
-import { quizEngine } from '../services/quizEngine';
+import { quizEngine, LiveQuestionConflictError } from '../services/quizEngine';
 import { ScoringService } from '../services/scoringService';
 import { db } from '../config/db';
 
@@ -17,15 +17,16 @@ export class QuizController {
 
   public static async startRound(req: AuthRequest, res: Response) {
     try {
-      const { roundId } = req.body;
+      const { roundId, endLiveQuestion } = req.body;
       if (!roundId) {
         return res.status(400).json({ error: 'roundId is required' });
       }
 
-      const session = quizEngine.setActiveRound(roundId);
+      const session = quizEngine.setActiveRound(roundId, { endLiveQuestion: endLiveQuestion === true });
       return res.json({ message: 'Round started', session });
     } catch (err: any) {
-      return res.status(400).json({ error: err.message || 'Failed to start round' });
+      const status = err instanceof LiveQuestionConflictError ? 409 : 400;
+      return res.status(status).json({ error: err.message || 'Failed to start round' });
     }
   }
 

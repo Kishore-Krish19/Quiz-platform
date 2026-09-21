@@ -10,6 +10,13 @@ export interface MongoStatus {
 
 const DEFAULT_LOCAL_MONGO = 'mongodb://127.0.0.1:27017/gadget_code';
 
+const reconnectListeners: Array<() => void> = [];
+
+/** Runs after MongoDB comes back from an outage — the store flushes the writes it held. */
+export function onMongoReconnected(listener: () => void) {
+  reconnectListeners.push(listener);
+}
+
 export const mongoState: MongoStatus = {
   isConnected: false,
   uri: process.env.MONGODB_URI || DEFAULT_LOCAL_MONGO,
@@ -70,10 +77,16 @@ export async function connectMongoDB(): Promise<boolean> {
       console.error('⚠️ [DATABASE ALERT] MongoDB disconnected from server!');
     });
 
-    mongoose.connection.on('reconnected', () => {
+    // Depending on how the outage ended the driver reports 'reconnected', 'connected' or
+    // both; either way the held writes must be flushed exactly when it is back.
+    const handleReconnect = () => {
+      if (mongoState.isConnected) return;
       mongoState.isConnected = true;
       console.log('✅ [DATABASE RECONNECTED] MongoDB reconnected successfully.');
-    });
+      reconnectListeners.forEach((listener) => listener());
+    };
+    mongoose.connection.on('reconnected', handleReconnect);
+    mongoose.connection.on('connected', handleReconnect);
 
     return true;
   } catch (err: any) {

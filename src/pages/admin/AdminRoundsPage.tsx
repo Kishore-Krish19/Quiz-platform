@@ -17,12 +17,14 @@ import { LoadingSpinner } from '../../components/common/LoadingSpinner';
 import { useSocket } from '../../store/socketContext';
 
 export const AdminRoundsPage: React.FC = () => {
-  const { quizState, selectRound } = useSocket();
+  const { quizState, refreshState } = useSocket();
   const [rounds, setRounds] = useState<Round[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(false);
   const [editingRound, setEditingRound] = useState<Round | null>(null);
   const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
+  const [switchTarget, setSwitchTarget] = useState<Round | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   const loadRounds = async () => {
     try {
@@ -60,8 +62,30 @@ export const AdminRoundsPage: React.FC = () => {
     }
   };
 
-  const handleActivateRound = (roundId: string) => {
-    selectRound(roundId);
+  const activateRound = async (roundId: string, endLiveQuestion: boolean) => {
+    try {
+      setActionError(null);
+      await api.setActiveRound(roundId, endLiveQuestion);
+      // The engine broadcasts the new state to every client; request it explicitly as
+      // well so this page's ACTIVE badge moves even if that broadcast is delayed.
+      refreshState();
+    } catch (err: any) {
+      setActionError(err.message || 'Failed to set active round');
+    }
+  };
+
+  const handleActivateRound = (round: Round) => {
+    // Switching under a live question pulls every player out of it, so ask first.
+    if (quizState?.status === 'QUESTION_ACTIVE') {
+      setSwitchTarget(round);
+      return;
+    }
+    activateRound(round.id, false);
+  };
+
+  const confirmSwitch = () => {
+    if (switchTarget) activateRound(switchTarget.id, true);
+    setSwitchTarget(null);
   };
 
   return (
@@ -90,6 +114,12 @@ export const AdminRoundsPage: React.FC = () => {
         </button>
       </div>
 
+      {actionError && (
+        <div className="p-3 rounded-xl bg-red-500/20 border border-red-500/50 text-red-300 font-mono-tech text-xs">
+          {actionError}
+        </div>
+      )}
+
       {/* Rounds Grid */}
       {isLoading ? (
         <LoadingSpinner label="Loading competition rounds..." />
@@ -110,7 +140,7 @@ export const AdminRoundsPage: React.FC = () => {
                 <div className="flex flex-col gap-3">
                   <div className="flex items-center justify-between">
                     <span className="font-mono-tech text-xs font-extrabold uppercase px-2.5 py-0.5 rounded bg-[#162136] text-cyan-300">
-                      ROUND #{round.order}
+                      ROUND #{round.roundNumber}
                     </span>
 
                     {isCurrentlyActive && (
@@ -151,10 +181,12 @@ export const AdminRoundsPage: React.FC = () => {
                 {/* Bottom Actions */}
                 <div className="flex items-center justify-between gap-2 pt-4 border-t border-[#1F2E4A]">
                   <button
-                    onClick={() => handleActivateRound(round.id)}
+                    onClick={() => handleActivateRound(round)}
+                    disabled={isCurrentlyActive}
+                    title={isCurrentlyActive ? 'This round is already live in the engine' : 'Make this the active round'}
                     className={`flex-1 py-2.5 rounded-xl font-display font-black text-xs tracking-wider transition-all flex items-center justify-center gap-1.5 ${
                       isCurrentlyActive
-                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40'
+                        ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 cursor-default'
                         : 'bg-[#162136] hover:bg-cyan-400 hover:text-black text-slate-200'
                     }`}
                   >
@@ -193,6 +225,17 @@ export const AdminRoundsPage: React.FC = () => {
         round={editingRound}
         onClose={() => setIsEditorOpen(false)}
         onSave={handleSaveRound}
+      />
+
+      {/* Switching rounds under a live question */}
+      <ConfirmDialog
+        isOpen={Boolean(switchTarget)}
+        title="A Question Is Live"
+        message={`Question ${quizState?.currentQuestionNumber ?? ''} of "${quizState?.activeRoundName ?? ''}" is running now (${quizState?.answeredPlayersCount ?? 0} answered). Switching ends it immediately for every player — answers already in are kept, scored and revealed — and then loads "${switchTarget?.name ?? ''}".`}
+        confirmLabel="END QUESTION & SWITCH"
+        variant="warning"
+        onConfirm={confirmSwitch}
+        onCancel={() => setSwitchTarget(null)}
       />
 
       {/* Delete Confirmation */}

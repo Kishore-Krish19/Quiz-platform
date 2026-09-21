@@ -5,6 +5,7 @@ import { RobotMascot } from '../components/common/RobotMascot';
 import { ConnectionIndicator } from '../components/common/ConnectionIndicator';
 import { api } from '../services/api';
 import { useAuth } from '../store/authContext';
+import { enterAppFullscreen } from '../utils/fullscreen';
 
 interface PlayerLoginPageProps {
   onBack: () => void;
@@ -12,8 +13,8 @@ interface PlayerLoginPageProps {
 
 export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
   const { login } = useAuth();
-  const [username, setUsername] = useState('player01');
-  const [password, setPassword] = useState('player123');
+  const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +29,11 @@ export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
       setError('Please enter a display name — this is what appears on the leaderboard');
       return;
     }
+
+    // Full screen is only allowed in direct response to the player's click or key press,
+    // so it is requested now, while this submit still is one: the login reply can arrive
+    // too late under a sign-in rush. The arena then opens already full screen.
+    void enterAppFullscreen();
 
     try {
       setIsLoading(true);
@@ -145,7 +151,7 @@ export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
 
           <div className="mt-6 pt-4 border-t border-[#1F2E4A] text-center">
             <p className="font-mono-tech text-[11px] text-slate-400">
-              Assigned credentials created by the event administrator. (Default seed: <strong className="text-yellow-400">player01</strong> / <strong className="text-yellow-400">player123</strong>)
+              Use the username and password on the slip the event organisers gave your team.
             </p>
           </div>
         </div>

@@ -1,6 +1,5 @@
 // Must be the first import: modules loaded below read process.env at module scope
-// (the JWT secret in middleware/auth, the Mongo URI in config/mongo), so .env has to
-// be in place before they are evaluated.
+// (the Mongo URI in config/mongo), so .env has to be in place before they are evaluated.
 import 'dotenv/config';
 import express from 'express';
 import http from 'http';
@@ -14,8 +13,13 @@ import { seedInitialData } from './server/services/seedService';
 import { connectMongoDB, mongoState } from './server/config/mongo';
 import { db } from './server/config/db';
 import { quizEngine } from './server/services/quizEngine';
+import { initAuth } from './server/middleware/auth';
+import { StartupConfigError } from './server/config/startupError';
 
 async function startServer() {
+  // Refuse to run with a published or guessable signing secret before anything else.
+  initAuth();
+
   const app = express();
   const server = http.createServer(app);
   
@@ -26,13 +30,17 @@ async function startServer() {
   try {
     await connectMongoDB();
     if (mongoState.isConnected) {
-      await db.loadFromMongoDB();
+      // Replays writes an earlier run held during an outage, then loads the store.
+      await db.attachMongo();
     }
   } catch (dbErr: any) {
     console.error('CRITICAL DATABASE ERROR ON BOOT:', dbErr.message);
     if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEV_FALLBACK !== 'true') {
       throw dbErr;
     }
+  }
+  if (!db.isUsingMongo()) {
+    db.useFileStore();
   }
 
   // Initialize seed data (Admin, Players, Round 1 with 10 questions into MongoDB)
@@ -103,6 +111,13 @@ async function startServer() {
 }
 
 startServer().catch((err) => {
-  console.error('Fatal server startup error:', err);
+  if (err instanceof StartupConfigError) {
+    console.error(`\n================================================================`);
+    console.error(`⛔ STARTUP REFUSED: ${err.message}`);
+    err.help.forEach((line) => console.error(`   ${line}`));
+    console.error(`================================================================\n`);
+  } else {
+    console.error('Fatal server startup error:', err);
+  }
   process.exit(1);
 });

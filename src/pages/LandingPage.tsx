@@ -33,12 +33,11 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
           Authoritative real-time technical quiz competition platform built for computer lab LANs and speed-critical hackathons.
         </p>
 
-        {/* Dual Portal Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 w-full max-w-2xl">
-          {/* Player Portal Card */}
+        {/* Player Portal — the only entry on the competitors' screen; admin access sits in the footer */}
+        <div className="w-full max-w-md">
           <button
             onClick={() => onSelectRole('player')}
-            className="group relative bg-[#0D1322] hover:bg-[#111A2B] border-2 border-yellow-500/40 hover:border-yellow-400 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center transition-all duration-300 shadow-[0_0_25px_rgba(255,214,0,0.15)] hover:shadow-[0_0_35px_rgba(255,214,0,0.35)] hover:-translate-y-1 cursor-pointer"
+            className="group relative w-full bg-[#0D1322] hover:bg-[#111A2B] border-2 border-yellow-500/40 hover:border-yellow-400 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center transition-all duration-300 shadow-[0_0_25px_rgba(255,214,0,0.15)] hover:shadow-[0_0_35px_rgba(255,214,0,0.35)] hover:-translate-y-1 cursor-pointer"
           >
             <div className="w-16 h-16 rounded-2xl bg-yellow-500/15 border border-yellow-500/40 flex items-center justify-center text-yellow-400 mb-4 group-hover:scale-110 transition-transform">
               <Gamepad2 className="w-8 h-8" />
@@ -59,31 +58,6 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
               <ArrowRight className="w-4 h-4" />
             </div>
           </button>
-
-          {/* Admin Portal Card */}
-          <button
-            onClick={() => onSelectRole('admin')}
-            className="group relative bg-[#0D1322] hover:bg-[#111A2B] border-2 border-cyan-500/40 hover:border-cyan-400 rounded-3xl p-6 md:p-8 flex flex-col items-center text-center transition-all duration-300 shadow-[0_0_25px_rgba(0,229,255,0.15)] hover:shadow-[0_0_35px_rgba(0,229,255,0.35)] hover:-translate-y-1 cursor-pointer"
-          >
-            <div className="w-16 h-16 rounded-2xl bg-cyan-500/15 border border-cyan-500/40 flex items-center justify-center text-cyan-400 mb-4 group-hover:scale-110 transition-transform">
-              <ShieldCheck className="w-8 h-8" />
-            </div>
-
-            <span className="font-mono-tech text-xs uppercase font-bold text-cyan-400 tracking-widest mb-1">
-              COMMAND CENTER
-            </span>
-            <h2 className="font-display font-black text-2xl text-white tracking-wide mb-2">
-              ADMIN CONTROL
-            </h2>
-            <p className="text-slate-400 text-xs leading-relaxed mb-6">
-              Manage rounds, broadcast questions, trigger timers, and export live competition leaderboards.
-            </p>
-
-            <div className="w-full py-3 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wider flex items-center justify-center gap-2 shadow-[0_0_15px_rgba(0,229,255,0.4)]">
-              <span>ACCESS CONSOLE</span>
-              <ArrowRight className="w-4 h-4" />
-            </div>
-          </button>
         </div>
       </main>
 
@@ -93,6 +67,13 @@ export const LandingPage: React.FC<LandingPageProps> = ({ onSelectRole }) => {
           <Terminal className="w-4 h-4 text-cyan-400" />
           <span>Local LAN Ethernet & Lab Ready • Authoritative Server Timers</span>
         </div>
+        <button
+          onClick={() => onSelectRole('admin')}
+          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-[#1F2E4A] hover:border-cyan-500/50 text-slate-400 hover:text-cyan-300 hover:bg-cyan-500/5 font-mono-tech text-xs font-bold tracking-wider transition-colors cursor-pointer"
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>ADMIN LOGIN</span>
+        </button>
         <div>
           <span>GADGET CODE © 2026</span>
         </div>
