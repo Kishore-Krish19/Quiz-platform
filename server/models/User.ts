@@ -7,6 +7,7 @@ export interface IUserDocument extends Document {
   passwordHash: string;
   role: 'ADMIN' | 'PLAYER';
   isActive: boolean;
+  activeSessionId?: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -19,6 +20,8 @@ const UserSchema = new Schema<IUserDocument>(
     passwordHash: { type: String, required: true },
     role: { type: String, enum: ['ADMIN', 'PLAYER'], default: 'PLAYER', required: true, index: true },
     isActive: { type: Boolean, default: true },
+    // Identifies the one sign-in currently allowed to use this player account.
+    activeSessionId: { type: String, default: null },
   },
   {
     timestamps: true,

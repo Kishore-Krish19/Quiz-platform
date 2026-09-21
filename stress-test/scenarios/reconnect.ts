@@ -23,8 +23,13 @@ export async function runReconnectScenario(
   await new Promise((res) => setTimeout(res, 500));
   const intermediateState = await admin.getQuizState();
   const expectedConnected = players.length - disconnectCount;
+  // /api/quiz/state responds with { state }, not { session } — reading the wrong key
+  // here made this line report "undefined" on every run.
+  const actualConnected = intermediateState.state?.connectedPlayersCount;
 
-  console.log(`   Disconnected ${disconnectCount} players. Active connected count: ${intermediateState.session?.connectedPlayersCount}`);
+  console.log(
+    `   Disconnected ${disconnectCount} players. Active connected count: ${actualConnected} (expected ${expectedConnected})`
+  );
 
   // 2. Reconnect each target player
   const reconnectLatencies: number[] = [];
@@ -68,6 +73,8 @@ export async function runReconnectScenario(
     durationMs,
     metrics: {
       disconnectedCount: disconnectCount,
+      connectedAfterDisconnect: actualConnected,
+      expectedAfterDisconnect: expectedConnected,
       reconnectedCount: targetPlayers.filter((p) => p.socketClient?.isConnected).length,
       avgReconnectLatencyMs: Math.round(avgReconnectLat),
       stateRestored: errors.length === 0,

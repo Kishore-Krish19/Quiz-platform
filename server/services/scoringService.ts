@@ -43,9 +43,17 @@ export class ScoringService {
   /**
    * Computes authoritative leaderboard for an active round or overall
    */
-  public static calculateLeaderboard(roundId?: string, connectedPlayerIds: Set<string> = new Set()): LeaderboardEntry[] {
+  public static calculateLeaderboard(
+    roundId?: string,
+    connectedPlayerIds: Set<string> = new Set(),
+    excludeQuestionId?: string
+  ): LeaderboardEntry[] {
     const players: User[] = db.getUsers().filter((u) => u.role === 'PLAYER' && u.isActive !== false);
-    const answers = db.getAnswers(roundId ? { roundId } : undefined);
+    // excludeQuestionId keeps the in-flight question out of the standings: a score
+    // that moved mid-question would tell a player they answered correctly.
+    const answers = db
+      .getAnswers(roundId ? { roundId } : undefined)
+      .filter((a) => !excludeQuestionId || a.questionId !== excludeQuestionId);
 
     const playerStatsMap = new Map<
       string,

@@ -87,9 +87,11 @@ export class QuizController {
   public static async getLeaderboard(req: Request, res: Response) {
     try {
       const roundId = req.query.roundId as string | undefined;
+      const session = db.getQuizSession();
       const leaderboard = ScoringService.calculateLeaderboard(
         roundId,
-        quizEngine.getConnectedPlayerUserIds()
+        quizEngine.getConnectedPlayerUserIds(),
+        session?.status === 'QUESTION_ACTIVE' ? session.currentQuestionId || undefined : undefined
       );
       return res.json({ leaderboard });
     } catch (err) {

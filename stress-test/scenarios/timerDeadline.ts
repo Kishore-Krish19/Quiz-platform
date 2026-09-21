@@ -56,7 +56,9 @@ export async function runTimerDeadlineScenario(
       await new Promise((resolve) => setTimeout(resolve, tc.delayMs));
       try {
         const res = await player.submitAnswerRest(question.id, question.options[0].id);
-        const accepted = !res.error && (res.result?.points !== undefined || res.points !== undefined);
+        // Submissions are acknowledged with a receipt; points stay embargoed until
+        // the question closes, so acceptance is read from the receipt.
+        const accepted = !res.error && (res.result?.accepted === true || res.accepted === true);
         return {
           label: tc.label,
           delayMs: tc.delayMs,

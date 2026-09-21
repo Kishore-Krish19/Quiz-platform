@@ -31,6 +31,8 @@ export class PlayerSimulator {
           username: this.username,
           password: this.password,
           expectedRole: 'PLAYER',
+          // A display name is mandatory for player logins.
+          displayName: this.displayName,
         }),
       });
 

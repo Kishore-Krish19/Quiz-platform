@@ -1,23 +1,512 @@
 {
-  "users": [],
-  "rounds": [],
-  "questions": [],
+  "users": [
+    {
+      "id": "admin_root",
+      "username": "admin",
+      "displayName": "System Admin",
+      "passwordHash": "$2b$10$WuY.JFX1APX0RjSwx4OOPOeGwCnrajEq8yGXPWJVpPEFopA8csEM6",
+      "role": "ADMIN",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.155Z",
+      "updatedAt": "2026-09-20T15:29:07.155Z"
+    },
+    {
+      "username": "player01",
+      "displayName": "ByteBandits (Lab 01)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147268_h94tv49c7",
+      "createdAt": "2026-09-20T15:29:07.268Z",
+      "updatedAt": "2026-09-20T15:29:07.268Z"
+    },
+    {
+      "username": "player02",
+      "displayName": "CyberKnights (Lab 02)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147269_0cyip4jos",
+      "createdAt": "2026-09-20T15:29:07.269Z",
+      "updatedAt": "2026-09-20T15:29:07.269Z"
+    },
+    {
+      "username": "player03",
+      "displayName": "QuantumCoders (Lab 03)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147269_0kbl02jcf",
+      "createdAt": "2026-09-20T15:29:07.269Z",
+      "updatedAt": "2026-09-20T15:29:07.269Z"
+    },
+    {
+      "username": "player04",
+      "displayName": "NullPointers (Lab 04)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147269_jpm9ksvhk",
+      "createdAt": "2026-09-20T15:29:07.269Z",
+      "updatedAt": "2026-09-20T15:29:07.269Z"
+    },
+    {
+      "username": "player05",
+      "displayName": "HexHunters (Lab 05)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147269_3km13xmyu",
+      "createdAt": "2026-09-20T15:29:07.269Z",
+      "updatedAt": "2026-09-20T15:29:07.269Z"
+    },
+    {
+      "username": "player06",
+      "displayName": "KernelPanic (Lab 06)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147270_ya41tfd92",
+      "createdAt": "2026-09-20T15:29:07.270Z",
+      "updatedAt": "2026-09-20T15:29:07.270Z"
+    },
+    {
+      "username": "player07",
+      "displayName": "BinaryBeasts (Lab 07)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147270_4y8jox29t",
+      "createdAt": "2026-09-20T15:29:07.270Z",
+      "updatedAt": "2026-09-20T15:29:07.270Z"
+    },
+    {
+      "username": "player08",
+      "displayName": "StackOverlords (Lab 08)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147270_ghjiq69pz",
+      "createdAt": "2026-09-20T15:29:07.271Z",
+      "updatedAt": "2026-09-20T15:29:07.271Z"
+    },
+    {
+      "username": "player09",
+      "displayName": "LogicLegends (Lab 09)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147271_yludt6kf9",
+      "createdAt": "2026-09-20T15:29:07.271Z",
+      "updatedAt": "2026-09-20T15:29:07.271Z"
+    },
+    {
+      "username": "player10",
+      "displayName": "DevDynasty (Lab 10)",
+      "passwordHash": "$2b$10$ZA0QarEj1q97S0pnUNONcOnS4YZ1kMJS8m7cNzkHhfKAze.fq99eu",
+      "role": "PLAYER",
+      "isActive": true,
+      "id": "user_1789918147271_1vktaiojp",
+      "createdAt": "2026-09-20T15:29:07.271Z",
+      "updatedAt": "2026-09-20T15:29:07.271Z"
+    }
+  ],
+  "rounds": [
+    {
+      "id": "round_1_tech_quiz",
+      "roundNumber": 1,
+      "name": "Round 1 — Technical Quiz",
+      "description": "Rapid-fire Technical MCQ Competition testing computing, networking, systems, and algorithms.",
+      "status": "READY",
+      "defaultDuration": 10,
+      "scoringConfig": {
+        "type": "SPEED_BASED",
+        "basePoints": 1000,
+        "minPoints": 100
+      },
+      "createdAt": "2026-09-20T15:29:07.272Z",
+      "updatedAt": "2026-09-20T15:29:07.272Z"
+    }
+  ],
+  "questions": [
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c4",
+      "roundId": "round_1_tech_quiz",
+      "order": 1,
+      "type": "MCQ",
+      "text": "In the OSI model, at which layer does the Transport Layer Security (TLS/SSL) protocol primarily operate?",
+      "options": [
+        {
+          "id": "opt_1_a",
+          "text": "Data Link Layer (Layer 2)"
+        },
+        {
+          "id": "opt_1_b",
+          "text": "Network Layer (Layer 3)"
+        },
+        {
+          "id": "opt_1_c",
+          "text": "Presentation / Session Layer (Layer 6/5)"
+        },
+        {
+          "id": "opt_1_d",
+          "text": "Physical Layer (Layer 1)"
+        }
+      ],
+      "correctOptionId": "opt_1_c",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "TLS/SSL operates between the Transport Layer (Layer 4) and Application Layer (Layer 7), commonly classified under Presentation/Session or Transport security wrapper.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.273Z",
+      "updatedAt": "2026-09-20T15:29:07.273Z",
+      "id": "6aaffbc36c2e80c52ebf15c4"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c5",
+      "roundId": "round_1_tech_quiz",
+      "order": 2,
+      "type": "MCQ",
+      "text": "What is the average time complexity of searching for an element in a balanced Binary Search Tree (such as an AVL or Red-Black Tree)?",
+      "options": [
+        {
+          "id": "opt_2_a",
+          "text": "O(1)"
+        },
+        {
+          "id": "opt_2_b",
+          "text": "O(log n)"
+        },
+        {
+          "id": "opt_2_c",
+          "text": "O(n)"
+        },
+        {
+          "id": "opt_2_d",
+          "text": "O(n log n)"
+        }
+      ],
+      "correctOptionId": "opt_2_b",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "Balanced BSTs maintain a height of O(log n), providing O(log n) search, insertion, and deletion times.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.273Z",
+      "updatedAt": "2026-09-20T15:29:07.273Z",
+      "id": "6aaffbc36c2e80c52ebf15c5"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c6",
+      "roundId": "round_1_tech_quiz",
+      "order": 3,
+      "type": "MCQ",
+      "text": "In Node.js event-driven architecture, what executes microtasks (like Promise callbacks and process.nextTick)?",
+      "options": [
+        {
+          "id": "opt_3_a",
+          "text": "The Microtask Queue between event loop phases"
+        },
+        {
+          "id": "opt_3_b",
+          "text": "The OS kernel worker threads directly"
+        },
+        {
+          "id": "opt_3_c",
+          "text": "Only during the Timers phase"
+        },
+        {
+          "id": "opt_3_d",
+          "text": "Inside the Close Callbacks queue exclusively"
+        }
+      ],
+      "correctOptionId": "opt_3_a",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "In the Node.js event loop, the microtask queue executes immediately after the current operation finishes, before moving to the next macrotask phase.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.274Z",
+      "updatedAt": "2026-09-20T15:29:07.274Z",
+      "id": "6aaffbc36c2e80c52ebf15c6"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c7",
+      "roundId": "round_1_tech_quiz",
+      "order": 4,
+      "type": "MCQ",
+      "text": "Which HTTP response status code is officially designated for \"I'm a teapot\" as defined in RFC 2324?",
+      "options": [
+        {
+          "id": "opt_4_a",
+          "text": "HTTP 402"
+        },
+        {
+          "id": "opt_4_b",
+          "text": "HTTP 418"
+        },
+        {
+          "id": "opt_4_c",
+          "text": "HTTP 429"
+        },
+        {
+          "id": "opt_4_d",
+          "text": "HTTP 451"
+        }
+      ],
+      "correctOptionId": "opt_4_b",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "HTTP 418 I'm a teapot was an April Fools' joke specification in 1998 that became a well-known standard code.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.274Z",
+      "updatedAt": "2026-09-20T15:29:07.274Z",
+      "id": "6aaffbc36c2e80c52ebf15c7"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c8",
+      "roundId": "round_1_tech_quiz",
+      "order": 5,
+      "type": "MCQ",
+      "text": "In relational database indexes, which data structure is most widely implemented for disk-based B-Tree indexing?",
+      "options": [
+        {
+          "id": "opt_5_a",
+          "text": "B+ Tree"
+        },
+        {
+          "id": "opt_5_b",
+          "text": "Min-Heap"
+        },
+        {
+          "id": "opt_5_c",
+          "text": "Trie"
+        },
+        {
+          "id": "opt_5_d",
+          "text": "Splay Tree"
+        }
+      ],
+      "correctOptionId": "opt_5_a",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "B+ Trees store all actual record pointers in leaf nodes linked sequentially, optimizing range queries and disk block reads.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.274Z",
+      "updatedAt": "2026-09-20T15:29:07.274Z",
+      "id": "6aaffbc36c2e80c52ebf15c8"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15c9",
+      "roundId": "round_1_tech_quiz",
+      "order": 6,
+      "type": "MCQ",
+      "text": "Which communication bus protocol requires only TWO physical wires (SDA and SCL) for synchronous serial communication between microcontrollers and sensors?",
+      "options": [
+        {
+          "id": "opt_6_a",
+          "text": "SPI (Serial Peripheral Interface)"
+        },
+        {
+          "id": "opt_6_b",
+          "text": "I2C (Inter-Integrated Circuit)"
+        },
+        {
+          "id": "opt_6_c",
+          "text": "UART (Universal Asynchronous Receiver-Transmitter)"
+        },
+        {
+          "id": "opt_6_d",
+          "text": "CAN Bus"
+        }
+      ],
+      "correctOptionId": "opt_6_b",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "I2C (Inter-Integrated Circuit) uses two bidirectional open-drain lines: Serial Data (SDA) and Serial Clock (SCL).",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.275Z",
+      "updatedAt": "2026-09-20T15:29:07.275Z",
+      "id": "6aaffbc36c2e80c52ebf15c9"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15ca",
+      "roundId": "round_1_tech_quiz",
+      "order": 7,
+      "type": "MCQ",
+      "text": "In operating systems, which of the following is NOT one of Coffman's four necessary conditions for a Deadlock to occur?",
+      "options": [
+        {
+          "id": "opt_7_a",
+          "text": "Mutual Exclusion"
+        },
+        {
+          "id": "opt_7_b",
+          "text": "Hold and Wait"
+        },
+        {
+          "id": "opt_7_c",
+          "text": "Forced Preemption"
+        },
+        {
+          "id": "opt_7_d",
+          "text": "Circular Wait"
+        }
+      ],
+      "correctOptionId": "opt_7_c",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "The 4 Coffman conditions are: Mutual Exclusion, Hold & Wait, No Preemption, and Circular Wait. Preemption breaks deadlocks.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.275Z",
+      "updatedAt": "2026-09-20T15:29:07.275Z",
+      "id": "6aaffbc36c2e80c52ebf15ca"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15cb",
+      "roundId": "round_1_tech_quiz",
+      "order": 8,
+      "type": "MCQ",
+      "text": "What Linux kernel mechanism is primarily used by Docker to isolate CPU, memory, and I/O resource consumption between containers?",
+      "options": [
+        {
+          "id": "opt_8_a",
+          "text": "cgroups (Control Groups)"
+        },
+        {
+          "id": "opt_8_b",
+          "text": "Chroot Jails exclusively"
+        },
+        {
+          "id": "opt_8_c",
+          "text": "Hypervisor Ring-0 virtualization"
+        },
+        {
+          "id": "opt_8_d",
+          "text": "SELinux policies only"
+        }
+      ],
+      "correctOptionId": "opt_8_a",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "Control Groups (cgroups) meter and limit resources (CPU, RAM, block I/O), while Namespaces isolate visibility (PID, NET, MNT).",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.276Z",
+      "updatedAt": "2026-09-20T15:29:07.276Z",
+      "id": "6aaffbc36c2e80c52ebf15cb"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15cc",
+      "roundId": "round_1_tech_quiz",
+      "order": 9,
+      "type": "MCQ",
+      "text": "In asymmetric cryptography, which mathematical problem provides the foundational security for standard RSA encryption?",
+      "options": [
+        {
+          "id": "opt_9_a",
+          "text": "Integer Factorization of large prime products"
+        },
+        {
+          "id": "opt_9_b",
+          "text": "Discrete Logarithm on elliptic curves"
+        },
+        {
+          "id": "opt_9_c",
+          "text": "Fast Fourier Transform"
+        },
+        {
+          "id": "opt_9_d",
+          "text": "Traveling Salesperson Problem"
+        }
+      ],
+      "correctOptionId": "opt_9_a",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "RSA security relies on the computational difficulty of factoring the product of two large prime numbers.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.276Z",
+      "updatedAt": "2026-09-20T15:29:07.276Z",
+      "id": "6aaffbc36c2e80c52ebf15cc"
+    },
+    {
+      "_id": "6aaffbc36c2e80c52ebf15cd",
+      "roundId": "round_1_tech_quiz",
+      "order": 10,
+      "type": "MCQ",
+      "text": "In Git version control, how are commit objects, trees, and blobs identified and verified for integrity?",
+      "options": [
+        {
+          "id": "opt_10_a",
+          "text": "Sequential auto-incrementing integer IDs"
+        },
+        {
+          "id": "opt_10_b",
+          "text": "SHA cryptographic hash of content"
+        },
+        {
+          "id": "opt_10_c",
+          "text": "Timestamp-based UUID version 4"
+        },
+        {
+          "id": "opt_10_d",
+          "text": "Central server registry index numbers"
+        }
+      ],
+      "correctOptionId": "opt_10_b",
+      "duration": 10,
+      "points": 1000,
+      "explanation": "Git uses SHA cryptographic hashes (SHA-1 / SHA-256) based on content to create a content-addressable Merkle DAG.",
+      "questionCode": "",
+      "imageUrl": "",
+      "afterImageUrl": "",
+      "isActive": true,
+      "createdAt": "2026-09-20T15:29:07.277Z",
+      "updatedAt": "2026-09-20T15:29:07.277Z",
+      "id": "6aaffbc36c2e80c52ebf15cd"
+    }
+  ],
   "answers": [],
   "quizSession": {
     "status": "WAITING",
-    "activeRoundId": null,
+    "lastEndedQuestionId": null,
+    "activeRoundId": "round_1_tech_quiz",
     "activeRoundNumber": 1,
     "activeRoundName": "Round 1 — Technical Quiz",
-    "currentQuestionId": null,
-    "currentQuestionNumber": null,
-    "totalQuestions": 0,
+    "currentQuestionId": "6aaffbc36c2e80c52ebf15c4",
+    "currentQuestionNumber": 1,
+    "totalQuestions": 10,
     "questionStartedAt": null,
     "questionEndsAt": null,
-    "duration": null,
-    "serverTime": 1788086972388,
+    "duration": 10,
+    "serverTime": 1789918147280,
     "connectedPlayersCount": 0,
     "answeredPlayersCount": 0,
-    "updatedAt": "2026-08-30T10:49:32.388Z"
+    "updatedAt": "2026-09-21T10:41:04.689Z"
   },
   "eventSettings": null
 }

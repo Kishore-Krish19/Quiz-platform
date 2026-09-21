@@ -7,6 +7,7 @@ export interface IQuizSessionDocument extends Document {
   activeRoundName: string | null;
   currentQuestionId: string | null;
   currentQuestionNumber: number | null;
+  lastEndedQuestionId: string | null;
   totalQuestions: number;
   questionStartedAt: number | null;
   questionEndsAt: number | null;
@@ -27,6 +28,7 @@ const QuizSessionSchema = new Schema<IQuizSessionDocument>(
     activeRoundName: { type: String, default: null },
     currentQuestionId: { type: String, default: null },
     currentQuestionNumber: { type: Number, default: null },
+    lastEndedQuestionId: { type: String, default: null },
     totalQuestions: { type: Number, default: 0 },
     questionStartedAt: { type: Number, default: null },
     questionEndsAt: { type: Number, default: null },

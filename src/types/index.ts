@@ -6,6 +6,8 @@ export interface User {
   displayName: string;
   role: UserRole;
   isActive: boolean;
+  /** Server-side only: the single sign-in currently allowed on this account. */
+  activeSessionId?: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -53,24 +55,30 @@ export interface Question {
   points: number;
   explanation?: string;
   questionCode?: string;
+  imageUrl?: string; // Optional image shown above the question text on the player screen
+  afterImageUrl?: string; // Optional image shown in the gap after this question ends
   isActive?: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
-// Client-safe question (without correctOptionId)
+// Client-safe question. correctOptionId and explanation are sent only after the
+// question closes (QUESTION_ENDED), never while it is accepting answers.
 export interface SafeQuestion {
   id: string;
   roundId: string;
   questionNumber: number;
   totalQuestions: number;
   type: QuestionType;
+  imageUrl?: string;
   text: string;
   options: QuestionOption[];
   duration: number;
   points: number;
   startTime: number;
   endTime: number;
+  correctOptionId?: string;
+  explanation?: string;
 }
 
 export type QuizStatus =
@@ -94,6 +102,9 @@ export interface QuizSessionState {
   duration: number | null;
   activeQuestion?: SafeQuestion | null;
   adminQuestionPreview?: Question | null;
+  // Image to hold on the player screen between questions, until the admin starts the next one
+  interstitialImageUrl?: string | null;
+  lastEndedQuestionId?: string | null;
   serverTime: number;
   connectedPlayersCount: number;
   answeredPlayersCount: number;
@@ -110,12 +121,16 @@ export interface AnswerResult {
   playerId: string;
   questionId: string;
   selectedOptionId: string;
-  correctOptionId: string;
-  isCorrect: boolean;
-  points: number;
   responseTimeMs: number;
-  totalScore: number;
-  currentRank: number;
+  accepted?: boolean;
+  // Everything below is embargoed while the question is still running, so that no
+  // player can learn the answer — or even whether they were right — before the rest.
+  // It is released to each player individually the moment the question closes.
+  correctOptionId?: string;
+  isCorrect?: boolean;
+  points?: number;
+  totalScore?: number;
+  currentRank?: number;
 }
 
 export interface LeaderboardEntry {
@@ -155,8 +170,15 @@ export interface ServerToClientEvents {
   }) => void;
   'quiz:round_completed': (data: { roundId: string; finalLeaderboard: LeaderboardEntry[] }) => void;
   'quiz:leaderboard_updated': (leaderboard: LeaderboardEntry[]) => void;
-  'quiz:player_answered_update': (stats: { answeredCount: number; totalConnected: number }) => void;
+  'quiz:player_answered_update': (stats: {
+    questionId: string;
+    answeredCount: number;
+    totalConnected: number;
+  }) => void;
   'player:answer_result': (result: AnswerResult) => void;
+  // Sent to a single player on (re)connect so a browser reload does not lose the
+  // result they already received. Same shape, but it is a replay, not a new result.
+  'player:answer_restored': (result: AnswerResult) => void;
   'player:connection_status': (data: { count: number; players: { id: string; username: string; displayName: string; isConnected: boolean }[] }) => void;
   'admin:stats_update': (stats: {
     connectedCount: number;

@@ -15,6 +15,8 @@ interface SocketContextType {
   socket: Socket | null;
   isConnected: boolean;
   isConnecting: boolean;
+  /** serverNow = Date.now() + serverTimeOffset. See the quiz:state handler. */
+  serverTimeOffset: number;
   quizState: QuizSessionState | null;
   leaderboard: LeaderboardEntry[];
   lastAnswerResult: AnswerResult | null;
@@ -33,6 +35,10 @@ interface SocketContextType {
   resetRound: (roundId: string) => void;
 }
 
+// How long answered-count pings are batched before a single re-render. Long enough
+// to collapse a 100-player answer burst, short enough that the counter still reads live.
+const PROGRESS_FLUSH_MS = 250;
+
 const SocketContext = createContext<SocketContextType | null>(null);
 
 export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -41,6 +47,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [isConnecting, setIsConnecting] = useState<boolean>(false);
   const [quizState, setQuizState] = useState<QuizSessionState | null>(null);
+  const [serverTimeOffset, setServerTimeOffset] = useState<number>(0);
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [lastAnswerResult, setLastAnswerResult] = useState<AnswerResult | null>(null);
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
@@ -58,6 +65,34 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
 
     setIsConnecting(true);
+
+    let pendingProgress: { questionId: string; answeredCount: number; totalConnected: number } | null = null;
+    let progressTimer: ReturnType<typeof setTimeout> | null = null;
+
+    const flushProgress = () => {
+      progressTimer = null;
+      const next = pendingProgress;
+      pendingProgress = null;
+      if (!next) return;
+
+      setQuizState((prev) => {
+        if (!prev) return prev;
+        // A ping for a question that is no longer in play would paint a stale count
+        // over the next question's fresh zero.
+        if (prev.currentQuestionId !== next.questionId) return prev;
+        if (
+          prev.answeredPlayersCount === next.answeredCount &&
+          prev.connectedPlayersCount === next.totalConnected
+        ) {
+          return prev;
+        }
+        return {
+          ...prev,
+          answeredPlayersCount: next.answeredCount,
+          connectedPlayersCount: next.totalConnected,
+        };
+      });
+    };
 
     const newSocket = io({
       auth: { token },
@@ -87,6 +122,17 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     newSocket.on('quiz:state', (state: QuizSessionState) => {
+      // questionEndsAt is a SERVER timestamp. Rendering a countdown as
+      // (questionEndsAt - Date.now()) measures it against this machine's clock, so an
+      // unsynced lab PC shows a countdown wrong by exactly its clock skew — the
+      // question still ends on time, but the number on screen lies. Track how far this
+      // clock sits from the server's and let the timer render server-relative time.
+      // The threshold ignores network jitter while still catching real drift.
+      if (typeof state.serverTime === 'number') {
+        const offset = state.serverTime - Date.now();
+        setServerTimeOffset((prev) => (Math.abs(prev - offset) > 200 ? offset : prev));
+      }
+
       setQuizState(state);
       if (state.leaderboardPreview && state.leaderboardPreview.length > 0) {
         setLeaderboard(state.leaderboardPreview);
@@ -119,12 +165,30 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     });
 
     newSocket.on('player:answer_result', (result: AnswerResult) => {
+      // Arrives twice: a bare receipt on submit, then the full result once the
+      // question closes. No sound here — the player screen owns the reveal chime,
+      // so nothing gives the answer away early.
       setLastAnswerResult(result);
-      if (result.isCorrect) {
-        sounds.playCorrectAnswer();
-      } else {
-        sounds.playIncorrectAnswer();
+    });
+
+    // One progress ping is broadcast per submission, so a 40-player burst delivers 40
+    // of them within a few hundred milliseconds. Coalesce into at most one re-render
+    // per tick, and drop the update entirely when nothing visible moved — otherwise
+    // every client re-renders the whole quiz screen N times at peak load.
+    newSocket.on('quiz:player_answered_update', (stats) => {
+      // Progress only — how many have answered, never who was right.
+      pendingProgress = stats;
+      if (!progressTimer) {
+        progressTimer = setTimeout(flushProgress, PROGRESS_FLUSH_MS);
       }
+    });
+
+    newSocket.on('player:answer_restored', (result: AnswerResult) => {
+      // A replay of a result this player already saw — restore it silently, with no
+      // correct/incorrect chime, since nothing new has happened.
+      setLastAnswerResult(result);
+      setSelectedOptionId(result.selectedOptionId);
+      setIsAnswerSubmitted(true);
     });
 
     newSocket.on('system:error', (msg: string) => {
@@ -135,6 +199,10 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setSocket(newSocket);
 
     return () => {
+      if (progressTimer) {
+        clearTimeout(progressTimer);
+        progressTimer = null;
+      }
       newSocket.disconnect();
     };
   }, [token, user]);
@@ -210,6 +278,7 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         socket,
         isConnected,
         isConnecting,
+        serverTimeOffset,
         quizState,
         leaderboard,
         lastAnswerResult,

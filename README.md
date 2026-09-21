@@ -14,8 +14,10 @@ Verified and stress-tested to support **40+ simultaneous players** with sub-3ms 
   $$\text{Points} = \text{round}\left(\text{minPoints} + (\text{basePoints} - \text{minPoints}) \times \frac{T_{\text{remaining}}}{T_{\text{duration}}}\right)$$
 - **🏆 Live Deterministic Leaderboard:** Instantaneous ranking updates with deterministic multi-tier tie-breaking:
   1. Highest Score $\to$ 2. Correct Answers Count $\to$ 3. Lowest Avg Response Time $\to$ 4. Alphabetical Username.
+- **🖼️ Image-Based Questions:** Any question can carry a picture — players see **image → question → options**. Each question can also carry a second image that holds the player screens between questions until the admin starts the next one. Images are uploaded from the admin panel and served from the server, so they work with no internet.
+- **🔒 Simultaneous Answer Reveal:** Nobody learns anything early. Submitting returns a receipt only — correctness, points and standings are all withheld until the timer ends, then released to every screen in the same instant.
 - **🛡️ Race & Exploit Defense:** Prevents double submissions, late submissions beyond deadline, and unauthorized admin event execution.
-- **🔄 Mid-Quiz Reconnection & Resilience:** Automatically restores player identity, score history, and active question state upon reconnect.
+- **🔄 Mid-Quiz Reconnection & Resilience:** Automatically restores player identity, score history, their own submitted answer, and active question state upon reconnect — a reload mid-question cannot be used to peek at the answer early.
 - **📊 Admin Control Center:** Full round management, question trigger controls, live answer statistics, CSV exports (matrix & leaderboard), and player management.
 - **🧪 Built-in Stress Testing Suite:** Automated zero-mock load-testing system supporting up to 100 concurrent players.
 
@@ -39,7 +41,7 @@ Verified and stress-tested to support **40+ simultaneous players** with sub-3ms 
 - **MongoDB Community Server** running locally on port `27017`
 
 ### 2. Environment Configuration
-Copy `.env.example` to `.env`:
+Copy `.env.example` to `.env`. These values are loaded at start-up (`dotenv/config`, the first import in `server.ts`); with no `.env` present the same values apply as built-in defaults.
 ```env
 PORT=3000
 NODE_ENV=development
@@ -70,6 +72,24 @@ On initial startup, the platform automatically provisions default administrative
 - **Player Accounts (10 Default Players):**
   - Usernames: `player01` through `player10`
   - Password: `player123`
+
+---
+
+## 🖼️ Question Images
+
+Open **Questions → Add / Edit** in the admin panel. Each question has two optional image slots:
+
+| Slot | Shown | Purpose |
+| :--- | :--- | :--- |
+| **Question Image** | Above the question text, for the whole time the question is live | Diagrams, circuits, code screenshots, logos to identify |
+| **After-Question Image** | On every player screen once the question closes, until you start the next one | Sponsor boards, round titles, an intermission card |
+
+- Accepts **PNG, JPEG, GIF, WEBP**, up to **5 MB** each. SVG is rejected on purpose: uploads are served from the app's own origin and an SVG can carry script.
+- Files are written to `data/uploads/` and served over HTTP. Only a short URL travels in the Socket.IO payload, so question broadcasts stay small and the sync spread is unaffected.
+- The admin Quiz Control screen shows a thumbnail of whatever is currently on the player screens, plus a **HOLD IMAGE** chip on any question that has one queued.
+- A question without an after-image simply falls back to the usual standby card, and the final question of a round goes straight to the podium.
+
+> **Backups:** `admin/export/backup.json` contains image *URLs*, not the image bytes. When moving an event to another machine, copy the `data/uploads/` folder across alongside the JSON, or the pictures will be missing.
 
 ---
 
@@ -123,9 +143,10 @@ npm run stress:cleanup
 
 ```
 ├── data/                  # Offline fallback data store (when MongoDB unavailable)
+│   └── uploads/           # Admin-uploaded question images (git-ignored, not in JSON backups)
 ├── server/
 │   ├── config/            # DB store & MongoDB connection setup
-│   ├── controllers/       # Auth, Admin, Quiz, and Export controllers
+│   ├── controllers/       # Auth, Admin, Quiz, Export, and Image Upload controllers
 │   ├── middleware/        # JWT auth & role validation middleware
 │   ├── models/            # Mongoose schemas (User, Round, Question, AnswerLog, QuizSession)
 │   ├── routes/            # REST API endpoints (/api/*)

@@ -11,6 +11,7 @@ import {
   VolumeX,
   Maximize2,
   HelpCircle,
+  Lock,
 } from 'lucide-react';
 import { GadgetLogo } from '../../components/common/GadgetLogo';
 import { RobotMascot } from '../../components/common/RobotMascot';
@@ -26,20 +27,32 @@ import { sounds } from '../../utils/soundEffects';
 
 export const PlayerQuizPage: React.FC = () => {
   const { user, logout } = useAuth();
-  const { quizState, leaderboard, submitAnswer, lastAnswerResult } = useSocket();
+  const { quizState, leaderboard, submitAnswer, lastAnswerResult, serverTimeOffset } = useSocket();
 
   const [selectedOptionId, setSelectedOptionId] = useState<string | null>(null);
   const [isAnswerSubmitted, setIsAnswerSubmitted] = useState<boolean>(false);
   const [isMuted, setIsMuted] = useState<boolean>(() => sounds.getMuted());
+  const [failedImages, setFailedImages] = useState<Record<string, boolean>>({});
+
+  const markImageFailed = (url: string) => setFailedImages((prev) => ({ ...prev, [url]: true }));
 
   // Track if we played sound for current question result
   const lastProcessedQuestionId = useRef<string | null>(null);
+  const lastResultSoundQuestionId = useRef<string | null>(null);
 
   const currentQuestion = quizState?.activeQuestion || (quizState as any)?.currentQuestion;
   const isQuestionActive = quizState?.status === 'QUESTION_ACTIVE';
   const isQuestionEnded = quizState?.status === 'QUESTION_ENDED';
   const isWaiting = quizState?.status === 'WAITING' || quizState?.status === 'IDLE';
   const isRoundComplete = quizState?.status === 'ROUND_COMPLETED';
+
+  // Image shown above the question text, and the hold image shown between questions.
+  const questionImageUrl =
+    currentQuestion?.imageUrl && !failedImages[currentQuestion.imageUrl] ? currentQuestion.imageUrl : null;
+  const interstitialImageUrl =
+    quizState?.interstitialImageUrl && !failedImages[quizState.interstitialImageUrl]
+      ? quizState.interstitialImageUrl
+      : null;
 
   // Find player's current leaderboard status
   const currentLeaderboardEntry = leaderboard.find((item) => item.playerId === user?.id);
@@ -51,8 +64,22 @@ export const PlayerQuizPage: React.FC = () => {
     lastAnswerResult && lastAnswerResult.questionId === currentQuestion?.id
       ? lastAnswerResult
       : (quizState as any)?.playerAnswers
-      ? (quizState as any).playerAnswers[user?.id || '']
-      : null;
+        ? (quizState as any).playerAnswers[user?.id || '']
+        : null;
+
+  // A reconnecting player gets their answer back from the server; that counts as
+  // submitted too, otherwise the options unlock and the server rejects the retry.
+  const hasSubmittedAnswer =
+    isAnswerSubmitted || (!!myAnswer && myAnswer.questionId === currentQuestion?.id);
+
+  // What the player locked in, for the waiting state below. Falls back to the
+  // server's receipt so it survives a reload mid-question.
+  const lockedOptionId = selectedOptionId || myAnswer?.selectedOptionId || null;
+  const lockedOptionIndex =
+    lockedOptionId && currentQuestion
+      ? currentQuestion.options.findIndex((opt: any) => opt.id === lockedOptionId)
+      : -1;
+  const lockedOption = lockedOptionIndex >= 0 ? currentQuestion.options[lockedOptionIndex] : null;
 
   // Reset local selection when a new question arrives
   useEffect(() => {
@@ -61,20 +88,24 @@ export const PlayerQuizPage: React.FC = () => {
         lastProcessedQuestionId.current = currentQuestion.id;
         setSelectedOptionId(null);
         setIsAnswerSubmitted(false);
-        sounds.playRoundStart();
+        // Do not chime when loading straight into a question that has already closed.
+        if (isQuestionActive) {
+          sounds.playRoundStart();
+        }
       }
     }
   }, [currentQuestion?.id]);
 
   // Handle result sound playback when question ends
   useEffect(() => {
-    if (isQuestionEnded && currentQuestion) {
-      if (myAnswer) {
-        sounds.playAnswerResult(myAnswer.isCorrect);
-      } else {
-        sounds.playAnswerResult(false);
-      }
-    }
+    if (!isQuestionEnded || !currentQuestion) return;
+    // A receipt with no verdict means this player's result is still in flight; wait
+    // for it rather than chiming "incorrect" at someone who got it right.
+    if (myAnswer && myAnswer.isCorrect === undefined) return;
+    if (lastResultSoundQuestionId.current === currentQuestion.id) return;
+
+    lastResultSoundQuestionId.current = currentQuestion.id;
+    sounds.playAnswerResult(myAnswer?.isCorrect === true);
   }, [isQuestionEnded, myAnswer, currentQuestion]);
 
   // Handle victory fanfare on round complete
@@ -86,7 +117,7 @@ export const PlayerQuizPage: React.FC = () => {
 
   // Submit answer
   const handleSelectOption = (optionId: string) => {
-    if (!isQuestionActive || !currentQuestion || isAnswerSubmitted) return;
+    if (!isQuestionActive || !currentQuestion || hasSubmittedAnswer) return;
     setSelectedOptionId(optionId);
     setIsAnswerSubmitted(true);
     sounds.playOptionSelect();
@@ -96,7 +127,7 @@ export const PlayerQuizPage: React.FC = () => {
   // Keyboard shortcut listener (Keys 1..4 or A..D)
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!isQuestionActive || !currentQuestion || isAnswerSubmitted) return;
+      if (!isQuestionActive || !currentQuestion || hasSubmittedAnswer) return;
 
       const key = e.key.toUpperCase();
       let index = -1;
@@ -117,7 +148,7 @@ export const PlayerQuizPage: React.FC = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isQuestionActive, currentQuestion, isAnswerSubmitted]);
+  }, [isQuestionActive, currentQuestion, hasSubmittedAnswer]);
 
   const handleToggleMute = () => {
     const next = sounds.toggleMute();
@@ -172,8 +203,25 @@ export const PlayerQuizPage: React.FC = () => {
 
       {/* Main Game Stage */}
       <main className="max-w-5xl w-full mx-auto my-auto py-4 flex flex-col items-center justify-center flex-1">
-        {/* VIEW 1: WAITING / STANDBY */}
-        {isWaiting && (
+        {/* VIEW 1A: BETWEEN-QUESTION HOLD IMAGE */}
+        {isWaiting && interstitialImageUrl && (
+          <div className="w-full max-w-4xl flex flex-col items-center gap-5 animate-fade-in">
+            <img
+              src={interstitialImageUrl}
+              alt="Between questions"
+              onError={() => markImageFailed(interstitialImageUrl)}
+              className="w-auto max-w-full max-h-[70vh] object-contain rounded-3xl border-2 border-cyan-500/40 bg-black/40 shadow-[0_0_40px_rgba(0,229,255,0.15)]"
+            />
+
+            <div className="flex items-center gap-2 text-slate-400 font-mono-tech text-xs">
+              <span className="w-2 h-2 rounded-full bg-cyan-400 animate-ping" />
+              <span>Hold tight — the coordinator will start the next question shortly...</span>
+            </div>
+          </div>
+        )}
+
+        {/* VIEW 1B: WAITING / STANDBY */}
+        {isWaiting && !interstitialImageUrl && (
           <div className="w-full max-w-2xl bg-[#0D1322] border-2 border-cyan-500/40 rounded-3xl p-6 md:p-10 flex flex-col items-center text-center shadow-[0_0_40px_rgba(0,229,255,0.15)] animate-fade-in">
             <div className="mb-6">
               <RobotMascot mood="excited" size="lg" />
@@ -243,12 +291,21 @@ export const PlayerQuizPage: React.FC = () => {
                 endTime={quizState?.questionEndsAt || null}
                 duration={quizState?.duration || currentQuestion.duration}
                 isActive={isQuestionActive}
+                serverTimeOffset={serverTimeOffset}
                 size="md"
               />
             </div>
 
-            {/* Question Statement Card */}
+            {/* Question Statement Card — image first, then the question text */}
             <div className="w-full bg-[#0D1322] border border-[#1F2E4A] rounded-3xl p-6 md:p-8 text-center shadow-lg">
+              {questionImageUrl && (
+                <img
+                  src={questionImageUrl}
+                  alt="Question illustration"
+                  onError={() => markImageFailed(questionImageUrl)}
+                  className="w-auto max-w-full max-h-[30vh] object-contain mx-auto mb-5 rounded-2xl border border-[#1F2E4A] bg-black/40"
+                />
+              )}
               <p className="font-display font-bold text-xl md:text-2xl text-white leading-relaxed">
                 {currentQuestion.text}
               </p>
@@ -276,8 +333,8 @@ export const PlayerQuizPage: React.FC = () => {
                     option={opt}
                     index={idx}
                     isSelected={isSelected}
-                    isLocked={isAnswerSubmitted || isQuestionEnded}
-                    isDisabled={!isQuestionActive || isAnswerSubmitted}
+                    isLocked={hasSubmittedAnswer || isQuestionEnded}
+                    isDisabled={!isQuestionActive || hasSubmittedAnswer}
                     revealState={revealState}
                     onSelect={handleSelectOption}
                   />
@@ -285,14 +342,66 @@ export const PlayerQuizPage: React.FC = () => {
               })}
             </div>
 
+            {/* Answer locked — the holding state between submitting and the reveal.
+                Deliberately neutral: it must not hint at correctness, because nobody
+                learns anything until the timer ends. */}
+            {isQuestionActive && hasSubmittedAnswer && (
+              <div className="w-full p-4 md:p-5 rounded-3xl border-2 border-cyan-500/50 bg-[#0D1322] flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in shadow-[0_0_25px_rgba(0,229,255,0.15)]">
+                <div className="flex items-center gap-3">
+                  <div className="p-3 rounded-2xl bg-cyan-400/20 border border-cyan-400/40 text-cyan-300">
+                    <Lock className="w-5 h-5" />
+                  </div>
+
+                  <div className="flex flex-col text-center sm:text-left">
+                    <h4 className="font-display font-black text-lg md:text-xl text-white tracking-wide">
+                      ANSWER LOCKED IN
+                    </h4>
+                    <span className="font-mono-tech text-xs text-slate-300">
+                      {lockedOption ? (
+                        <>
+                          You chose{' '}
+                          <span className="text-cyan-300 font-bold">
+                            {String.fromCharCode(65 + lockedOptionIndex)}
+                          </span>{' '}
+                          — {lockedOption.text}
+                        </>
+                      ) : (
+                        'Your answer has been recorded.'
+                      )}
+                    </span>
+                    <span className="font-mono-tech text-[11px] text-slate-500 mt-0.5">
+                      Sit tight — everyone sees the correct answer when the timer runs out.
+                    </span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-5 font-mono-tech shrink-0">
+                  {typeof myAnswer?.responseTimeMs === 'number' && (
+                    <div className="text-center">
+                      <span className="text-[10px] uppercase font-bold text-slate-500 block">Locked At</span>
+                      <span className="font-display font-black text-lg text-cyan-400">
+                        {(myAnswer.responseTimeMs / 1000).toFixed(2)}s
+                      </span>
+                    </div>
+                  )}
+                  <div className="text-center">
+                    <span className="text-[10px] uppercase font-bold text-slate-500 block">Answered</span>
+                    <span className="font-display font-black text-lg text-white">
+                      {quizState?.answeredPlayersCount ?? 0}
+                      <span className="text-slate-500">/{quizState?.connectedPlayersCount ?? 0}</span>
+                    </span>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Question Result Banner (Shown when Question Ends) */}
             {isQuestionEnded && (
               <div
-                className={`w-full p-4 md:p-6 rounded-3xl border-2 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in ${
-                  myAnswer?.isCorrect
-                    ? 'bg-emerald-950/40 border-emerald-400 text-emerald-200 shadow-[0_0_25px_rgba(52,211,153,0.3)]'
-                    : 'bg-red-950/40 border-red-500 text-red-200 shadow-[0_0_25px_rgba(239,68,68,0.3)]'
-                }`}
+                className={`w-full p-4 md:p-6 rounded-3xl border-2 flex flex-col sm:flex-row items-center justify-between gap-4 animate-fade-in ${myAnswer?.isCorrect
+                  ? 'bg-emerald-950/40 border-emerald-400 text-emerald-200 shadow-[0_0_25px_rgba(52,211,153,0.3)]'
+                  : 'bg-red-950/40 border-red-500 text-red-200 shadow-[0_0_25px_rgba(239,68,68,0.3)]'
+                  }`}
               >
                 <div className="flex items-center gap-3">
                   {myAnswer?.isCorrect ? (
@@ -313,8 +422,8 @@ export const PlayerQuizPage: React.FC = () => {
                       {myAnswer?.isCorrect
                         ? `Answered in ${(myAnswer.responseTimeMs / 1000).toFixed(2)}s • +${(myAnswer.points || (myAnswer as any).pointsEarned || 0).toLocaleString()} Points Awarded!`
                         : myAnswer
-                        ? 'No points awarded for this question.'
-                        : 'No answer was submitted before the timer ran out.'}
+                          ? 'No points awarded for this question.'
+                          : 'No answer was submitted before the timer ran out.'}
                     </span>
                   </div>
                 </div>

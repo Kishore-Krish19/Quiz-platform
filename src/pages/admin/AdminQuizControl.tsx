@@ -12,6 +12,7 @@ import {
   Clock,
   Sparkles,
   AlertTriangle,
+  Image as ImageIcon,
 } from 'lucide-react';
 import { StatusBadge } from '../../components/common/StatusBadge';
 import { QuizTimer } from '../../components/quiz/QuizTimer';
@@ -28,6 +29,7 @@ export const AdminQuizControl: React.FC = () => {
     nextQuestion,
     previousQuestion,
     resetRound,
+    serverTimeOffset,
   } = useSocket();
 
   const [isResetDialogOpen, setIsResetDialogOpen] = useState(false);
@@ -140,6 +142,26 @@ export const AdminQuizControl: React.FC = () => {
         </div>
       </div>
 
+      {/* Live hold-image indicator — what players are looking at between questions */}
+      {quizState?.interstitialImageUrl && (
+        <div className="bg-[#0D1322] border-2 border-cyan-500/40 rounded-3xl p-4 flex flex-col sm:flex-row items-center gap-4 shadow-[0_0_20px_rgba(0,229,255,0.12)]">
+          <img
+            src={quizState.interstitialImageUrl}
+            alt="Currently on player screens"
+            className="w-32 h-20 object-contain rounded-xl border border-[#1F2E4A] bg-black/40"
+          />
+          <div className="flex-1 text-center sm:text-left">
+            <span className="font-mono-tech text-[11px] uppercase font-black text-cyan-300 flex items-center justify-center sm:justify-start gap-1.5">
+              <ImageIcon className="w-3.5 h-3.5" />
+              Now showing on every player screen
+            </span>
+            <p className="font-mono-tech text-xs text-slate-400 mt-1">
+              Competitors are holding on this image. Press START QUESTION when you are ready to continue.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Main Grid: Question Preview + Telemetry & Live Leaderboard */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left 2 Cols: Question Preview Card */}
@@ -171,8 +193,26 @@ export const AdminQuizControl: React.FC = () => {
                     <Clock className="w-3.5 h-3.5 text-cyan-400" />
                     <span>{preview.duration}s TIMER</span>
                   </div>
+                  {preview.afterImageUrl && (
+                    <div
+                      className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-[#111A2B] border border-emerald-500/40 text-emerald-300 font-bold"
+                      title="An image will hold on player screens after this question ends"
+                    >
+                      <ImageIcon className="w-3.5 h-3.5" />
+                      <span>HOLD IMAGE</span>
+                    </div>
+                  )}
                 </div>
               </div>
+
+              {/* Question Image */}
+              {preview.imageUrl && (
+                <img
+                  src={preview.imageUrl}
+                  alt="Question illustration"
+                  className="w-auto max-w-full max-h-64 object-contain mx-auto rounded-2xl border border-[#1F2E4A] bg-black/40"
+                />
+              )}
 
               {/* Question Text */}
               <div className="p-4 rounded-2xl bg-[#070B14] border border-[#1F2E4A]">
@@ -286,6 +326,7 @@ export const AdminQuizControl: React.FC = () => {
               endTime={quizState?.questionEndsAt || null}
               duration={quizState?.duration || preview?.duration || 10}
               isActive={isQuestionActive}
+              serverTimeOffset={serverTimeOffset}
               size="md"
             />
 

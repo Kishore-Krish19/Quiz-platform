@@ -14,6 +14,7 @@ export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
   const { login } = useAuth();
   const [username, setUsername] = useState('player01');
   const [password, setPassword] = useState('player123');
+  const [displayName, setDisplayName] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -23,11 +24,15 @@ export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
       setError('Please enter your player username and password');
       return;
     }
+    if (!displayName.trim()) {
+      setError('Please enter a display name — this is what appears on the leaderboard');
+      return;
+    }
 
     try {
       setIsLoading(true);
       setError(null);
-      const res = await api.login(username.trim(), password, 'PLAYER');
+      const res = await api.login(username.trim(), password, 'PLAYER', displayName.trim());
       login(res.token, res.user);
     } catch (err: any) {
       setError(err.message || 'Authentication failed');
@@ -107,6 +112,26 @@ export const PlayerLoginPage: React.FC<PlayerLoginPageProps> = ({ onBack }) => {
                 className="w-full p-3.5 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-white font-mono-tech text-sm outline-none transition-colors"
                 required
               />
+            </div>
+
+            <div className="flex flex-col gap-1.5">
+              <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-yellow-400" />
+                Display Name
+              </label>
+              <input
+                type="text"
+                value={displayName}
+                onChange={(e) => setDisplayName(e.target.value)}
+                placeholder="Team name shown on the leaderboard..."
+                maxLength={40}
+                className="w-full p-3.5 bg-[#070B14] border border-[#1F2E4A] focus:border-yellow-400 rounded-xl text-white font-mono-tech text-sm outline-none transition-colors"
+                required
+              />
+              <p className="font-mono-tech text-[11px] text-slate-500">
+                This is the name competitors and the leaderboard will see. One account can
+                be signed in on one machine at a time.
+              </p>
             </div>
 
             <button

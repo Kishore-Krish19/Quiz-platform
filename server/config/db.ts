@@ -257,6 +257,27 @@ class DatabaseStore {
     const idx = this.data.rounds.findIndex((r) => r.id === id || r._id === id);
     if (idx !== -1) {
       const removed = this.data.rounds.splice(idx, 1)[0];
+
+      // Never leave the live session pointing at a round that no longer exists —
+      // that dangling reference is what makes a later boot look like a round is
+      // already under way while START QUESTION reports "Round has no questions".
+      if (this.data.quizSession && this.data.quizSession.activeRoundId === id) {
+        this.setQuizSession({
+          ...this.data.quizSession,
+          status: 'WAITING',
+          lastEndedQuestionId: null,
+          activeRoundId: null,
+          activeRoundNumber: null,
+          activeRoundName: null,
+          currentQuestionId: null,
+          currentQuestionNumber: null,
+          totalQuestions: 0,
+          questionStartedAt: null,
+          questionEndsAt: null,
+          duration: null,
+        });
+      }
+
       const questionIds = this.data.questions.filter((q) => q.roundId === id).map((q) => q.id);
       this.data.questions = this.data.questions.filter((q) => q.roundId !== id);
       this.data.answers = this.data.answers.filter(
@@ -315,6 +336,8 @@ class DatabaseStore {
       points: Number(question.points) || 1000,
       explanation: question.explanation || '',
       questionCode: question.questionCode || '',
+      imageUrl: question.imageUrl || '',
+      afterImageUrl: question.afterImageUrl || '',
       isActive: question.isActive !== false,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -510,6 +533,7 @@ class DatabaseStore {
     if (this.data.quizSession && (!roundId || this.data.quizSession.activeRoundId === roundId)) {
       this.data.quizSession = {
         status: 'WAITING',
+        lastEndedQuestionId: null,
         activeRoundId: this.data.quizSession.activeRoundId,
         activeRoundNumber: this.data.quizSession.activeRoundNumber,
         activeRoundName: this.data.quizSession.activeRoundName,

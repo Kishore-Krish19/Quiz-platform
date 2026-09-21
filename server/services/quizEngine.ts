@@ -18,7 +18,11 @@ export class QuizEngine {
   private onQuestionEndCallbacks: ((data: { questionId: string; correctOptionId: string; stats: any }) => void)[] = [];
   private onQuestionStartCallbacks: ((question: SafeQuestion) => void)[] = [];
   private onRoundCompletedCallbacks: ((data: { roundId: string; finalLeaderboard: LeaderboardEntry[] }) => void)[] = [];
-  private onAnswerSubmittedCallbacks: ((data: { answeredCount: number; totalConnected: number }) => void)[] = [];
+  private onAnswerSubmittedCallbacks: ((data: {
+    questionId: string;
+    answeredCount: number;
+    totalConnected: number;
+  }) => void)[] = [];
 
   private constructor() {
     this.recoverState();
@@ -35,37 +39,100 @@ export class QuizEngine {
    * Recovers state on server startup or reboot
    */
   private recoverState() {
+    this.reconcileSession();
+    this.resumeActiveQuestion();
+  }
+
+  /**
+   * Brings the persisted session back in line with the data that actually exists.
+   *
+   * The session document outlives every restart, so without this the platform
+   * resumes whatever the last run left behind — including a round that has since
+   * been deleted. That greets the operator with a stale status (a finished round
+   * they never ran) and makes START QUESTION fail with "Round has no questions",
+   * because the session still points at a round id that resolves to nothing.
+   *
+   * Must also be run once the database has loaded: the engine is constructed at
+   * import time, before startServer() pulls the session out of MongoDB.
+   */
+  public reconcileSession() {
     const session = db.getQuizSession();
-    if (!session) {
-      // Initialize default session with Round 1 if available
-      const rounds = db.getRounds();
-      const round1 = rounds[0];
-      const initialSession: QuizSessionState = {
+    const round = session?.activeRoundId ? db.getRoundById(session.activeRoundId) : null;
+
+    if (!round) {
+      // Either there was never a session, or it names a round that no longer exists.
+      // Any stored status is then meaningless bookkeeping from a previous event, so
+      // start clean on the first round that is actually available.
+      const fallback = db.getRounds()[0];
+      const questions = fallback ? db.getQuestions(fallback.id) : [];
+
+      db.setQuizSession({
         status: 'WAITING',
-        activeRoundId: round1 ? round1.id : null,
-        activeRoundNumber: round1 ? round1.roundNumber : 1,
-        activeRoundName: round1 ? round1.name : 'Round 1 — Technical Quiz',
-        currentQuestionId: null,
-        currentQuestionNumber: null,
-        totalQuestions: round1 ? db.getQuestions(round1.id).length : 0,
+        lastEndedQuestionId: null,
+        activeRoundId: fallback ? fallback.id : null,
+        activeRoundNumber: fallback ? fallback.roundNumber : null,
+        activeRoundName: fallback ? fallback.name : null,
+        currentQuestionId: questions.length > 0 ? questions[0].id : null,
+        currentQuestionNumber: questions.length > 0 ? 1 : null,
+        totalQuestions: questions.length,
         questionStartedAt: null,
         questionEndsAt: null,
-        duration: null,
+        duration: fallback ? fallback.defaultDuration || null : null,
         serverTime: Date.now(),
         connectedPlayersCount: 0,
         answeredPlayersCount: 0,
-      };
-      db.setQuizSession(initialSession);
-    } else if (session.status === 'QUESTION_ACTIVE' && session.questionEndsAt) {
-      const now = Date.now();
-      if (now >= session.questionEndsAt) {
-        // Automatically close expired question on reboot
-        this.endCurrentQuestion();
-      } else {
-        // Resume remaining timer
-        const remainingMs = session.questionEndsAt - now;
-        this.startAuthoritativeTimer(remainingMs);
-      }
+      });
+      return;
+    }
+
+    // The round is real, so a mid-event restart is a legitimate resume: keep the
+    // status. Only correct what can drift behind the data — the question count, the
+    // round's name, and a pointer to a question that has since been deleted.
+    const questions = db.getQuestions(round.id);
+    const currentStillExists =
+      !!session.currentQuestionId && questions.some((q) => q.id === session.currentQuestionId);
+
+    db.setQuizSession({
+      ...session,
+      activeRoundNumber: round.roundNumber,
+      activeRoundName: round.name,
+      totalQuestions: questions.length,
+      currentQuestionId: currentStillExists
+        ? session.currentQuestionId
+        : questions.length > 0
+        ? questions[0].id
+        : null,
+      currentQuestionNumber: currentStillExists
+        ? session.currentQuestionNumber
+        : questions.length > 0
+        ? 1
+        : null,
+    });
+  }
+
+  /**
+   * Re-arms — or immediately closes — a question that was still live when the
+   * process died.
+   *
+   * This must also be run once the database has finished loading. The engine is a
+   * singleton constructed at import time, which happens before startServer() pulls
+   * the session out of MongoDB, so on a MongoDB deployment the constructor's pass
+   * sees an empty store and leaves the countdown unarmed — the question then hangs
+   * past its deadline until an operator ends it by hand. Safe to call repeatedly:
+   * arming a timer clears any existing one first.
+   */
+  public resumeActiveQuestion() {
+    const session = db.getQuizSession();
+    if (!session || session.status !== 'QUESTION_ACTIVE' || !session.questionEndsAt) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now >= session.questionEndsAt) {
+      // The deadline passed while the server was down — close it out immediately.
+      this.endCurrentQuestion();
+    } else {
+      this.startAuthoritativeTimer(session.questionEndsAt - now);
     }
   }
 
@@ -92,6 +159,27 @@ export class QuizEngine {
     return this.getConnectedPlayerUserIds().size;
   }
 
+  public isPlayerConnected(userId: string): boolean {
+    return this.getConnectedPlayerUserIds().has(userId);
+  }
+
+  /**
+   * Lets an operator boot a player's sockets — the escape hatch when a machine has
+   * crashed or been left logged in and the account needs to be freed mid-event.
+   * Wired to Socket.IO by the socket layer, which owns the io instance.
+   */
+  private forceDisconnectHandler: ((userId: string) => void) | null = null;
+
+  public onForceDisconnect(cb: (userId: string) => void) {
+    this.forceDisconnectHandler = cb;
+  }
+
+  public forceDisconnectPlayer(userId: string) {
+    if (this.forceDisconnectHandler) {
+      this.forceDisconnectHandler(userId);
+    }
+  }
+
   // Event subscription hooks
   public onStateChange(cb: (state: QuizSessionState) => void) {
     this.onStateChangeCallbacks.push(cb);
@@ -109,7 +197,9 @@ export class QuizEngine {
     this.onRoundCompletedCallbacks.push(cb);
   }
 
-  public onAnswerSubmitted(cb: (data: { answeredCount: number; totalConnected: number }) => void) {
+  public onAnswerSubmitted(
+    cb: (data: { questionId: string; answeredCount: number; totalConnected: number }) => void
+  ) {
     this.onAnswerSubmittedCallbacks.push(cb);
   }
 
@@ -136,14 +226,13 @@ export class QuizEngine {
     };
 
     const connectedCount = this.getConnectedPlayerCount();
-    const answeredCount = session.currentQuestionId
-      ? db.getAnswers({ questionId: session.currentQuestionId }).length
-      : 0;
-
-    let correctCount = 0;
-    if (session.currentQuestionId) {
-      correctCount = db.getAnswers({ questionId: session.currentQuestionId }).filter((a) => a.isCorrect).length;
-    }
+    // One pass over the answer log, not two — this runs on every broadcast.
+    const currentAnswers = session.currentQuestionId
+      ? db.getAnswers({ questionId: session.currentQuestionId })
+      : [];
+    const answeredCount = currentAnswers.length;
+    // Only the operator receives this, so only the operator pays to compute it.
+    const correctCount = isAdmin ? currentAnswers.filter((a) => a.isCorrect).length : 0;
 
     let activeSafeQuestion: SafeQuestion | null = null;
     let adminPreview: Question | null = null;
@@ -155,13 +244,14 @@ export class QuizEngine {
         const qIndex = questionsInRound.findIndex((item) => item.id === q.id);
         const qNum = qIndex >= 0 ? qIndex + 1 : q.order || 1;
 
-        if (session.status === 'QUESTION_ACTIVE') {
+        if (session.status === 'QUESTION_ACTIVE' || session.status === 'QUESTION_ENDED') {
           activeSafeQuestion = {
             id: q.id,
             roundId: q.roundId,
             questionNumber: qNum,
             totalQuestions: questionsInRound.length,
             type: q.type || 'MCQ',
+            imageUrl: q.imageUrl || undefined,
             text: q.text,
             options: q.options,
             duration: session.duration || q.duration || 10,
@@ -169,6 +259,13 @@ export class QuizEngine {
             startTime: session.questionStartedAt || Date.now(),
             endTime: session.questionEndsAt || Date.now() + 10000,
           };
+
+          // Reveal the answer key only once the question is closed. While the question
+          // is live these must stay omitted — players receive this same payload.
+          if (session.status === 'QUESTION_ENDED') {
+            activeSafeQuestion.correctOptionId = q.correctOptionId;
+            activeSafeQuestion.explanation = q.explanation || '';
+          }
         }
 
         if (isAdmin) {
@@ -177,9 +274,19 @@ export class QuizEngine {
       }
     }
 
+    // Between-question hold image: once a question has closed and the admin has
+    // advanced, players sit on that question's follow-up image until the next start.
+    let interstitialImageUrl: string | null = null;
+    if (session.status === 'WAITING' && session.lastEndedQuestionId) {
+      const endedQuestion = db.getQuestionById(session.lastEndedQuestionId);
+      interstitialImageUrl = endedQuestion?.afterImageUrl || null;
+    }
+
+    // Points from the question in play stay out of the standings until it closes.
     const leaderboard = ScoringService.calculateLeaderboard(
       session.activeRoundId || undefined,
-      this.getConnectedPlayerUserIds()
+      this.getConnectedPlayerUserIds(),
+      session.status === 'QUESTION_ACTIVE' ? session.currentQuestionId || undefined : undefined
     );
 
     return {
@@ -195,10 +302,13 @@ export class QuizEngine {
       duration: session.duration,
       activeQuestion: activeSafeQuestion,
       adminQuestionPreview: adminPreview,
+      interstitialImageUrl,
       serverTime: Date.now(),
       connectedPlayersCount: connectedCount,
       answeredPlayersCount: answeredCount,
-      correctAnswersCount: correctCount,
+      // Operator telemetry only. With few answers in, a player could read this off
+      // the wire and work out their own result before the question closes.
+      correctAnswersCount: isAdmin ? correctCount : undefined,
       leaderboardPreview: leaderboard.slice(0, 10),
     };
   }
@@ -221,6 +331,7 @@ export class QuizEngine {
 
     const session: QuizSessionState = {
       status: 'WAITING',
+      lastEndedQuestionId: null,
       activeRoundId: round.id,
       activeRoundNumber: round.roundNumber,
       activeRoundName: round.name,
@@ -285,6 +396,7 @@ export class QuizEngine {
 
     // Update authoritative session
     session.status = 'QUESTION_ACTIVE';
+    session.lastEndedQuestionId = null;
     session.currentQuestionId = targetQuestion.id;
     session.currentQuestionNumber = questionNumber;
     session.totalQuestions = questions.length;
@@ -345,6 +457,7 @@ export class QuizEngine {
     if (!question) return;
 
     session.status = 'QUESTION_ENDED';
+    session.lastEndedQuestionId = question.id;
     db.setQuizSession(session);
 
     // Gather question stats
@@ -429,6 +542,7 @@ export class QuizEngine {
     if (currentIndex > 0) {
       const prevQ = questions[currentIndex - 1];
       session.status = 'WAITING';
+      session.lastEndedQuestionId = null;
       session.currentQuestionId = prevQ.id;
       session.currentQuestionNumber = currentIndex;
       session.questionStartedAt = null;
@@ -451,6 +565,80 @@ export class QuizEngine {
     }
     db.resetQuizProgress(roundId);
     this.setActiveRound(roundId);
+  }
+
+  /**
+   * Full result for one player on a question, answer key included. Only ever handed
+   * out for a question that has already closed.
+   */
+  private buildAnswerResult(answer: any, question: Question, leaderboard: LeaderboardEntry[]): AnswerResult {
+    const entry = leaderboard.find((l) => l.playerId === answer.playerId);
+    return {
+      playerId: answer.playerId,
+      questionId: answer.questionId,
+      selectedOptionId: answer.selectedOptionId,
+      responseTimeMs: answer.responseTimeMs,
+      accepted: true,
+      correctOptionId: question.correctOptionId,
+      isCorrect: answer.isCorrect,
+      points: answer.points || 0,
+      totalScore: entry ? entry.score : answer.points || 0,
+      currentRank: entry ? entry.rank : 1,
+    };
+  }
+
+  /**
+   * Every answering player's full result for a closed question, from a single
+   * leaderboard pass. Released per-player the moment the question ends.
+   */
+  public getQuestionResults(questionId: string): AnswerResult[] {
+    const question = db.getQuestionById(questionId);
+    if (!question) return [];
+
+    const session = db.getQuizSession();
+    const leaderboard = ScoringService.calculateLeaderboard(
+      session?.activeRoundId || undefined,
+      this.getConnectedPlayerUserIds()
+    );
+
+    return db.getAnswers({ questionId }).map((a) => this.buildAnswerResult(a, question, leaderboard));
+  }
+
+  /**
+   * Rebuilds the answer result a player already received for the question in play.
+   * Used on (re)connect: the shared quiz:state broadcast cannot carry per-player
+   * data, so a reloading player would otherwise lose their own result.
+   * Returns null when they have not answered the current question.
+   */
+  public getRestorableAnswer(playerId: string): AnswerResult | null {
+    const session = db.getQuizSession();
+    if (!session || !session.currentQuestionId) return null;
+    if (session.status !== 'QUESTION_ACTIVE' && session.status !== 'QUESTION_ENDED') return null;
+
+    const existing = db.getAnswer(playerId, session.currentQuestionId);
+    if (!existing) return null;
+
+    // Mid-question, hand back only the receipt: reconnecting must not become a way
+    // to peek at the answer ahead of everyone else.
+    if (session.status === 'QUESTION_ACTIVE') {
+      return {
+        playerId,
+        questionId: existing.questionId,
+        selectedOptionId: existing.selectedOptionId,
+        responseTimeMs: existing.responseTimeMs,
+        accepted: true,
+      };
+    }
+
+    const question = db.getQuestionById(session.currentQuestionId);
+    if (!question) return null;
+
+    const leaderboard = ScoringService.calculateLeaderboard(
+      session.activeRoundId || undefined,
+      this.getConnectedPlayerUserIds()
+    );
+
+    return this.buildAnswerResult(existing, question, leaderboard);
   }
 
   /**
@@ -500,7 +688,7 @@ export class QuizEngine {
       round?.scoringConfig
     );
 
-    const savedAnswer = db.addAnswer({
+    db.addAnswer({
       playerId,
       roundId: question.roundId,
       questionId,
@@ -511,28 +699,25 @@ export class QuizEngine {
       points,
     });
 
-    const leaderboard = ScoringService.calculateLeaderboard(
-      session.activeRoundId || undefined,
-      this.getConnectedPlayerUserIds()
-    );
-    const playerEntry = leaderboard.find((l) => l.playerId === playerId);
-
+    // The player gets a receipt, nothing more. Correctness, points and standings are
+    // withheld until the question closes so everyone learns the answer at the same
+    // moment. Skipping the leaderboard pass here also keeps the submit path cheap
+    // under an answer storm.
     const result: AnswerResult = {
       playerId,
       questionId,
       selectedOptionId,
-      correctOptionId: question.correctOptionId,
-      isCorrect,
-      points,
       responseTimeMs,
-      totalScore: playerEntry ? playerEntry.score : points,
-      currentRank: playerEntry ? playerEntry.rank : 1,
+      accepted: true,
     };
 
     // Notify connected players answer count update
+    // Tagged with the question so a client can discard a ping that arrives after
+    // the round has already moved on.
     const answeredCount = db.getAnswers({ questionId }).length;
     this.onAnswerSubmittedCallbacks.forEach((cb) =>
       cb({
+        questionId,
         answeredCount,
         totalConnected: this.getConnectedPlayerCount(),
       })

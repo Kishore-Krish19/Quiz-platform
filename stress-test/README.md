@@ -37,7 +37,7 @@ Automated, end-to-end load testing suite designed to evaluate real-time performa
 5. **Server-Authoritative Timer Enforcement**: Exact deadline cutoff with sub-millisecond precision.
 6. **Simultaneous Answer Storm**: 40-100 player burst submissions within <50ms.
 7. **Double Submission Defense**: Ensures immediate duplicate/secondary submissions are rejected.
-8. **Scoring Accuracy**: Validates linear speed-based decay formula and point calculations.
+8. **Scoring Accuracy & Result Embargo**: Validates the linear speed-based decay formula and point calculations, and asserts that a submission receipt never leaks correctness, points or standings while the question is still running.
 9. **Leaderboard Integrity**: Multi-tier deterministic tie-breaking and rank consistency.
 10. **Mid-Quiz Reconnection**: Reconnecting dropped players with state and score recovery.
 11. **Multi-Question Round Simulation**: Full 10-question round (400 total answers).

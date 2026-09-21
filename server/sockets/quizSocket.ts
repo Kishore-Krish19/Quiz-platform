@@ -1,5 +1,5 @@
 import { Server as SocketIOServer, Socket } from 'socket.io';
-import { verifyToken } from '../middleware/auth';
+import { verifyToken, isSessionCurrent } from '../middleware/auth';
 import { quizEngine } from '../services/quizEngine';
 import { ScoringService } from '../services/scoringService';
 import { db } from '../config/db';
@@ -17,6 +17,10 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     const user = verifyToken(token);
     if (!user) {
       return next(new Error('Invalid or expired authentication token'));
+    }
+
+    if (!isSessionCurrent(user)) {
+      return next(new Error('This account has been signed in on another device'));
     }
 
     // Attach user to socket data
@@ -52,7 +56,8 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     // Also broadcast updated leaderboard
     const leaderboard = ScoringService.calculateLeaderboard(
       state.activeRoundId || undefined,
-      quizEngine.getConnectedPlayerUserIds()
+      quizEngine.getConnectedPlayerUserIds(),
+      state.status === 'QUESTION_ACTIVE' ? state.currentQuestionId || undefined : undefined
     );
     io.emit('quiz:leaderboard_updated', leaderboard);
   });
@@ -63,6 +68,12 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
 
   quizEngine.onQuestionEnd((data) => {
     io.emit('quiz:question_ended', data);
+
+    // The question is closed, so the embargo lifts: every player who answered now
+    // receives their own result, privately and all at the same moment.
+    quizEngine.getQuestionResults(data.questionId).forEach((result) => {
+      io.to(`user_${result.playerId}`).emit('player:answer_result', result);
+    });
     // Broadcast updated leaderboard right after question ends
     const session = db.getQuizSession();
     const leaderboard = ScoringService.calculateLeaderboard(
@@ -78,6 +89,11 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
 
   quizEngine.onAnswerSubmitted((stats) => {
     io.emit('quiz:player_answered_update', stats);
+  });
+
+  // Operator escape hatch: drop every socket held by one player account.
+  quizEngine.onForceDisconnect((userId) => {
+    io.in(`user_${userId}`).disconnectSockets(true);
   });
 
   // Handle individual client connections
@@ -100,6 +116,17 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     const isAdmin = user.role === 'ADMIN';
     socket.emit('quiz:state', quizEngine.getCurrentState(isAdmin));
 
+    // Replay this player's own answer for the question in play, so a reload or a
+    // dropped connection mid-question does not strand them without their result.
+    const restorePlayerAnswer = () => {
+      if (user.role !== 'PLAYER') return;
+      const restored = quizEngine.getRestorableAnswer(user.id);
+      if (restored) {
+        socket.emit('player:answer_restored', restored);
+      }
+    };
+    restorePlayerAnswer();
+
     // Broadcast updated player counts
     broadcastConnectionStatus();
 
@@ -108,6 +135,7 @@ export function setupQuizSocket(io: SocketIOServer<ClientToServerEvents, ServerT
     // Sync request
     socket.on('quiz:request_sync', () => {
       socket.emit('quiz:state', quizEngine.getCurrentState(user.role === 'ADMIN'));
+      restorePlayerAnswer();
     });
 
     // Player submit answer

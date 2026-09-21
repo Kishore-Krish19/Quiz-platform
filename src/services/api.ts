@@ -34,11 +34,11 @@ async function handleResponse<T>(res: Response): Promise<T> {
 
 export const api = {
   // Auth
-  async login(username: string, password: string, expectedRole?: string) {
+  async login(username: string, password: string, expectedRole?: string, displayName?: string) {
     const res = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ username, password, expectedRole }),
+      body: JSON.stringify({ username, password, expectedRole, displayName }),
     });
     return handleResponse<{ token: string; user: User }>(res);
   },
@@ -169,6 +169,15 @@ export const api = {
     return handleResponse<{ player: User }>(res);
   },
 
+  async forceSignOutPlayer(id: string) {
+    const res = await fetch(`${API_BASE}/admin/players/${id}`, {
+      method: 'PUT',
+      headers: getAuthHeaders(),
+      body: JSON.stringify({ forceSignOut: true }),
+    });
+    return handleResponse<any>(res);
+  },
+
   async deletePlayer(id: string) {
     const res = await fetch(`${API_BASE}/admin/players/${id}`, {
       method: 'DELETE',
@@ -244,6 +253,21 @@ export const api = {
       body: JSON.stringify(updates),
     });
     return handleResponse<{ question: Question }>(res);
+  },
+
+  // Images post as a raw binary body, so this deliberately bypasses getAuthHeaders()
+  // (which would force Content-Type: application/json).
+  async uploadImage(file: File) {
+    const token = localStorage.getItem('gadget_code_token');
+    const res = await fetch(API_BASE + '/admin/uploads', {
+      method: 'POST',
+      headers: {
+        'Content-Type': file.type,
+        ...(token ? { Authorization: 'Bearer ' + token } : {}),
+      },
+      body: file,
+    });
+    return handleResponse<{ url: string; filename: string; sizeBytes: number }>(res);
   },
 
   async deleteQuestion(id: string) {

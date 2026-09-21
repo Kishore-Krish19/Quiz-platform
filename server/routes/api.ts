@@ -1,8 +1,9 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { AuthController } from '../controllers/authController';
 import { AdminController } from '../controllers/adminController';
 import { QuizController } from '../controllers/quizController';
 import { ExportController } from '../controllers/exportController';
+import { UploadController, UPLOADS_DIR, MAX_IMAGE_BYTES } from '../controllers/uploadController';
 import { authenticateToken, requireRole } from '../middleware/auth';
 import { mongoState } from '../config/mongo';
 import { db } from '../config/db';
@@ -42,6 +43,17 @@ router.get('/db-status', (req, res) => {
   });
 });
 
+// Quiz Images (public GET — <img src> cannot send an Authorization header)
+router.use(
+  '/uploads',
+  express.static(UPLOADS_DIR, {
+    fallthrough: false,
+    index: false,
+    maxAge: '1h',
+    setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
+  })
+);
+
 // Auth Routes
 router.post('/auth/login', AuthController.login);
 router.get('/auth/me', authenticateToken, AuthController.getMe);
@@ -78,6 +90,15 @@ router.get('/admin/rounds/:roundId/questions', authenticateToken, requireRole('A
 router.post('/admin/rounds/:roundId/questions', authenticateToken, requireRole('ADMIN'), AdminController.createQuestion);
 router.put('/admin/questions/:id', authenticateToken, requireRole('ADMIN'), AdminController.updateQuestion);
 router.delete('/admin/questions/:id', authenticateToken, requireRole('ADMIN'), AdminController.deleteQuestion);
+
+// Admin Only - Image Uploads (raw image body, parsed before the JSON body parser sees it)
+router.post(
+  '/admin/uploads',
+  authenticateToken,
+  requireRole('ADMIN'),
+  express.raw({ type: 'image/*', limit: MAX_IMAGE_BYTES }),
+  UploadController.uploadImage
+);
 
 // Admin Only - Settings & Exports
 router.get('/admin/settings', authenticateToken, requireRole('ADMIN'), AdminController.getSettings);

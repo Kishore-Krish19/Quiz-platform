@@ -120,7 +120,7 @@ export const AdminQuestionsPage: React.FC = () => {
           className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wide shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 disabled:opacity-50 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ ADD QUESTION</span>
+          <span>ADD QUESTION</span>
         </button>
       </div>
 
@@ -229,17 +229,15 @@ export const AdminQuestionsPage: React.FC = () => {
                     return (
                       <div
                         key={opt.id}
-                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs ${
-                          isCorrect
-                            ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200 font-bold'
-                            : 'bg-[#070B14] border-[#1F2E4A] text-slate-400'
-                        }`}
+                        className={`p-2.5 rounded-xl border flex items-center justify-between gap-2 text-xs ${isCorrect
+                          ? 'bg-emerald-950/40 border-emerald-500/60 text-emerald-200 font-bold'
+                          : 'bg-[#070B14] border-[#1F2E4A] text-slate-400'
+                          }`}
                       >
                         <div className="flex items-center gap-2">
                           <span
-                            className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${
-                              isCorrect ? 'bg-emerald-400 text-black' : 'bg-[#162136] text-slate-400'
-                            }`}
+                            className={`w-5 h-5 rounded flex items-center justify-center font-bold text-[10px] ${isCorrect ? 'bg-emerald-400 text-black' : 'bg-[#162136] text-slate-400'
+                              }`}
                           >
                             {letters[optIdx]}
                           </span>

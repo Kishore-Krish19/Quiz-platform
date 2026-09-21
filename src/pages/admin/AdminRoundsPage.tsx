@@ -86,7 +86,7 @@ export const AdminRoundsPage: React.FC = () => {
           className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wide shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 cursor-pointer"
         >
           <Plus className="w-4 h-4" />
-          <span>+ CREATE NEW ROUND</span>
+          <span>CREATE NEW ROUND</span>
         </button>
       </div>
 

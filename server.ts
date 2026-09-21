@@ -1,3 +1,7 @@
+// Must be the first import: modules loaded below read process.env at module scope
+// (the JWT secret in middleware/auth, the Mongo URI in config/mongo), so .env has to
+// be in place before they are evaluated.
+import 'dotenv/config';
 import express from 'express';
 import http from 'http';
 import path from 'path';
@@ -9,6 +13,7 @@ import { setupQuizSocket } from './server/sockets/quizSocket';
 import { seedInitialData } from './server/services/seedService';
 import { connectMongoDB, mongoState } from './server/config/mongo';
 import { db } from './server/config/db';
+import { quizEngine } from './server/services/quizEngine';
 
 async function startServer() {
   const app = express();
@@ -56,6 +61,14 @@ async function startServer() {
   });
 
   setupQuizSocket(io);
+
+  // The engine is a singleton built at import time — before the database load above —
+  // so its own recovery pass ran against an empty store on a MongoDB deployment. Now
+  // that the session is really in memory, re-run it: reconcile the stored session
+  // against the rounds that actually exist, then re-arm (or close out) a question
+  // that was still live when the process died.
+  quizEngine.reconcileSession();
+  quizEngine.resumeActiveQuestion();
 
   // REST API Routes FIRST
   app.use('/api', apiRouter);

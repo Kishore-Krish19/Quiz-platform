@@ -68,6 +68,15 @@ export const AdminPlayersPage: React.FC = () => {
     }
   };
 
+  const handleForceSignOut = async (player: any) => {
+    try {
+      await api.forceSignOutPlayer(player.id);
+      loadPlayers();
+    } catch (err) {
+      console.error('Force sign-out failed:', err);
+    }
+  };
+
   const handleToggleActive = async (player: any) => {
     try {
       await api.updatePlayer(player.id, { isActive: !player.isActive });
@@ -108,7 +117,7 @@ export const AdminPlayersPage: React.FC = () => {
           className="px-5 py-2.5 rounded-xl bg-cyan-400 hover:bg-cyan-300 text-black font-display font-black text-sm tracking-wide shadow-[0_0_20px_rgba(0,229,255,0.4)] flex items-center gap-2 cursor-pointer"
         >
           <UserPlus className="w-4 h-4" />
-          <span>+ ADD / BULK GENERATE</span>
+          <span>ADD / BULK GENERATE</span>
         </button>
       </div>
 
@@ -247,6 +256,18 @@ export const AdminPlayersPage: React.FC = () => {
                             title="Reset password"
                           >
                             <KeyRound className="w-4 h-4" />
+                          </button>
+                          <button
+                            onClick={() => handleForceSignOut(player)}
+                            disabled={!player.isConnected}
+                            className="p-1.5 rounded-lg bg-[#162136] hover:bg-orange-500/20 text-slate-400 hover:text-orange-300 transition-colors disabled:opacity-30 disabled:hover:bg-[#162136] disabled:hover:text-slate-400"
+                            title={
+                              player.isConnected
+                                ? 'Force sign-out — frees this account so it can log in elsewhere'
+                                : 'Not signed in anywhere'
+                            }
+                          >
+                            <WifiOff className="w-4 h-4" />
                           </button>
                           <button
                             onClick={() => setDeleteTargetId(player.id)}

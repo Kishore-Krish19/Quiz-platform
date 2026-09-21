@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { X, Plus, Trash2, CheckCircle2, Clock, Zap } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { X, Plus, Trash2, CheckCircle2, Clock, Zap, ImagePlus, Upload } from 'lucide-react';
 import { Question, QuestionOption } from '../../types';
+import { api } from '../../services/api';
 
 interface QuestionEditorModalProps {
   isOpen: boolean;
@@ -9,6 +10,92 @@ interface QuestionEditorModalProps {
   onClose: () => void;
   onSave: (data: Partial<Question>) => Promise<void>;
 }
+
+const ImageField: React.FC<{
+  label: string;
+  hint: string;
+  value: string;
+  onChange: (url: string) => void;
+}> = ({ label, hint, value, onChange }) => {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const handleFile = async (file?: File) => {
+    if (!file) return;
+    setUploadError(null);
+    setIsUploading(true);
+    try {
+      const { url } = await api.uploadImage(file);
+      onChange(url);
+    } catch (err: any) {
+      setUploadError(err.message || 'Image upload failed');
+    } finally {
+      setIsUploading(false);
+      if (inputRef.current) inputRef.current.value = '';
+    }
+  };
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <label className="font-mono-tech text-xs uppercase font-bold text-slate-300 flex items-center gap-1.5">
+        <ImagePlus className="w-3.5 h-3.5 text-cyan-400" />
+        {label}
+      </label>
+      <p className="font-mono-tech text-[11px] text-slate-500 -mt-0.5">{hint}</p>
+
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/png,image/jpeg,image/gif,image/webp"
+        className="hidden"
+        onChange={(e) => handleFile(e.target.files?.[0])}
+      />
+
+      {value ? (
+        <div className="flex items-center gap-3 p-2 rounded-xl bg-[#070B14] border border-[#1F2E4A]">
+          <img
+            src={value}
+            alt={label}
+            className="w-24 h-16 object-contain rounded-lg bg-black/40 border border-[#1F2E4A]"
+          />
+          <div className="flex-1 min-w-0">
+            <p className="font-mono-tech text-[11px] text-emerald-400 font-bold">IMAGE ATTACHED</p>
+            <p className="font-mono-tech text-[10px] text-slate-500 truncate">{value}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => inputRef.current?.click()}
+            disabled={isUploading}
+            className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 font-mono-tech text-[11px] font-bold disabled:opacity-50"
+          >
+            {isUploading ? 'UPLOADING...' : 'REPLACE'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onChange('')}
+            className="p-1.5 text-slate-500 hover:text-red-400 transition-colors"
+            title="Remove image"
+          >
+            <Trash2 className="w-4 h-4" />
+          </button>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={() => inputRef.current?.click()}
+          disabled={isUploading}
+          className="flex items-center justify-center gap-2 w-full p-3 rounded-xl bg-[#070B14] border border-dashed border-[#1F2E4A] hover:border-cyan-400 text-slate-400 hover:text-cyan-300 font-mono-tech text-xs font-bold transition-colors disabled:opacity-50"
+        >
+          <Upload className="w-4 h-4" />
+          <span>{isUploading ? 'UPLOADING...' : 'UPLOAD IMAGE (PNG, JPEG, GIF, WEBP - max 5 MB)'}</span>
+        </button>
+      )}
+
+      {uploadError && <p className="font-mono-tech text-[11px] text-red-400">{uploadError}</p>}
+    </div>
+  );
+};
 
 export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
   isOpen,
@@ -28,6 +115,8 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
   const [duration, setDuration] = useState<number>(10);
   const [points, setPoints] = useState<number>(1000);
   const [explanation, setExplanation] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [afterImageUrl, setAfterImageUrl] = useState('');
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -48,6 +137,8 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
       setDuration(question.duration || 10);
       setPoints(question.points || 1000);
       setExplanation(question.explanation || '');
+      setImageUrl(question.imageUrl || '');
+      setAfterImageUrl(question.afterImageUrl || '');
     } else {
       setText('');
       setOptions([
@@ -60,6 +151,8 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
       setDuration(10);
       setPoints(1000);
       setExplanation('');
+      setImageUrl('');
+      setAfterImageUrl('');
     }
     setError(null);
   }, [question, isOpen]);
@@ -111,6 +204,8 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
         duration: Number(duration) || 10,
         points: Number(points) || 1000,
         explanation: explanation.trim(),
+        imageUrl: imageUrl.trim(),
+        afterImageUrl: afterImageUrl.trim(),
       });
       onClose();
     } catch (err: any) {
@@ -144,6 +239,14 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
         )}
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {/* Question Image */}
+          <ImageField
+            label="Question Image (Optional)"
+            hint="Shown above the question text on every player screen."
+            value={imageUrl}
+            onChange={setImageUrl}
+          />
+
           {/* Question Text */}
           <div className="flex flex-col gap-1.5">
             <label className="font-mono-tech text-xs uppercase font-bold text-slate-300">
@@ -290,6 +393,14 @@ export const QuestionEditorModal: React.FC<QuestionEditorModalProps> = ({
               className="w-full p-3 bg-[#070B14] border border-[#1F2E4A] focus:border-cyan-400 rounded-xl text-white placeholder-slate-500 text-sm outline-none transition-colors"
             />
           </div>
+
+          {/* After-question hold image */}
+          <ImageField
+            label="After-Question Image (Optional)"
+            hint="Held on player screens once this question ends, until you start the next one."
+            value={afterImageUrl}
+            onChange={setAfterImageUrl}
+          />
 
           {/* Action buttons */}
           <div className="flex items-center justify-end gap-3 mt-4 pt-4 border-t border-[#1F2E4A]">

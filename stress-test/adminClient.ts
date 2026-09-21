@@ -157,16 +157,34 @@ export class AdminClient {
     return await res.json();
   }
 
+  /**
+   * Resolves the round the stress scenarios are allowed to operate on.
+   *
+   * The dedicated stress round wins outright. Scenarios call resetScores() on
+   * whatever round they are handed, so resolving to "whatever is currently active"
+   * would let a load test wipe a live competition round's answer log. That is the
+   * namespace guarantee in this suite's README, and it must not depend on which
+   * round an operator happens to have selected.
+   *
+   * (This previously read state.session?.activeRoundId — a key that never exists,
+   * since /api/quiz/state returns { state }. The active-round branch was therefore
+   * dead, and the safe fallback below is what has actually been running. Rather
+   * than revive that branch and make the suite destructive, the safe order is now
+   * the explicit contract.)
+   */
   public async getActiveOrTestRoundId(): Promise<string> {
-    const state = await this.getQuizState();
-    if (state.session?.activeRoundId) {
-      return state.session.activeRoundId;
-    }
     const roundsRes = await this.getRounds();
     const stressRound = (roundsRes.rounds || []).find(
       (r: any) => r.name === STRESS_CONFIG.TEST_ROUND_NAME || r.id === STRESS_CONFIG.TEST_ROUND_ID
     );
     if (stressRound) return stressRound.id;
+
+    // No stress round provisioned (setup never run): fall back to the active round,
+    // then to the first round that exists.
+    const state = await this.getQuizState();
+    if (state.state?.activeRoundId) {
+      return state.state.activeRoundId;
+    }
     return (roundsRes.rounds || [])[0]?.id || '';
   }
 
@@ -177,10 +195,11 @@ export class AdminClient {
     return await res.json();
   }
 
-  public async getLeaderboard() {
-    const res = await fetch(`${STRESS_CONFIG.BASE_URL}/api/quiz/leaderboard`, {
-      headers: this.authHeaders(),
-    });
+  public async getLeaderboard(roundId?: string) {
+    const url = roundId
+      ? `${STRESS_CONFIG.BASE_URL}/api/quiz/leaderboard?roundId=${encodeURIComponent(roundId)}`
+      : `${STRESS_CONFIG.BASE_URL}/api/quiz/leaderboard`;
+    const res = await fetch(url, { headers: this.authHeaders() });
     return await res.json();
   }
 }

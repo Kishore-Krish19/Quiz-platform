@@ -6,6 +6,8 @@ interface QuizTimerProps {
   endTime: number | null;
   duration: number; // in seconds
   isActive: boolean;
+  /** Milliseconds to add to Date.now() to obtain the server's clock. */
+  serverTimeOffset?: number;
   onTimeExpire?: () => void;
   size?: 'sm' | 'md' | 'lg';
   className?: string;
@@ -16,26 +18,33 @@ export const QuizTimer: React.FC<QuizTimerProps> = ({
   endTime,
   duration,
   isActive,
+  serverTimeOffset = 0,
   onTimeExpire,
   size = 'md',
   className = '',
 }) => {
+  // endTime comes from the server clock, so the countdown must be measured against
+  // the server clock too, not this machine's.
+  const serverNow = () => Date.now() + serverTimeOffset;
+
   const [remainingMs, setRemainingMs] = useState<number>(() => {
-    if (!endTime || !isActive) return duration * 1000;
-    return Math.max(0, endTime - Date.now());
+    if (!endTime) return duration * 1000;
+    if (!isActive) return 0;
+    return Math.max(0, endTime - serverNow());
   });
 
   const lastBeepSecond = useRef<number | null>(null);
 
   useEffect(() => {
     if (!isActive || !endTime) {
-      setRemainingMs(duration * 1000);
+      // No end time yet means the question has not started, so show its full duration.
+      // An end time with the question inactive means it has closed: read TIME'S UP.
+      setRemainingMs(!endTime ? duration * 1000 : 0);
       return;
     }
 
     const interval = setInterval(() => {
-      const now = Date.now();
-      const left = Math.max(0, endTime - now);
+      const left = Math.max(0, endTime - serverNow());
       setRemainingMs(left);
 
       const secondsLeft = Math.ceil(left / 1000);
@@ -55,7 +64,7 @@ export const QuizTimer: React.FC<QuizTimerProps> = ({
     }, 100);
 
     return () => clearInterval(interval);
-  }, [isActive, endTime, duration, onTimeExpire]);
+  }, [isActive, endTime, duration, onTimeExpire, serverTimeOffset]);
 
   const totalDurationMs = (duration || 10) * 1000;
   const progressRatio = Math.max(0, Math.min(1, remainingMs / totalDurationMs));

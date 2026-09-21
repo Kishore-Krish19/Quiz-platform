@@ -123,7 +123,14 @@ export class AdminController {
   public static async updatePlayer(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { displayName, isActive, password } = req.body;
+      const { displayName, isActive, password, forceSignOut } = req.body;
+
+      // Releases an account whose machine crashed or was left logged in: clearing the
+      // session id invalidates its token, and the sockets are dropped so the seat frees.
+      if (forceSignOut) {
+        db.updateUser(id, { activeSessionId: null });
+        quizEngine.forceDisconnectPlayer(id);
+      }
 
       const updates: any = {};
       if (displayName !== undefined) updates.displayName = displayName;
@@ -278,7 +285,17 @@ export class AdminController {
   public static async createQuestion(req: Request, res: Response) {
     try {
       const { roundId } = req.params;
-      const { text, options, correctOptionId, duration = 10, points = 1000, explanation, type = 'MCQ' } = req.body;
+      const {
+        text,
+        options,
+        correctOptionId,
+        duration = 10,
+        points = 1000,
+        explanation,
+        imageUrl,
+        afterImageUrl,
+        type = 'MCQ',
+      } = req.body;
 
       if (!text || !options || !Array.isArray(options) || options.length < 2 || !correctOptionId) {
         return res.status(400).json({ error: 'Question text, valid options, and correctOptionId are required' });
@@ -297,6 +314,8 @@ export class AdminController {
         duration: Number(duration) || 10,
         points: Number(points) || 1000,
         explanation: explanation?.trim() || '',
+        imageUrl: imageUrl?.trim() || '',
+        afterImageUrl: afterImageUrl?.trim() || '',
         isActive: true,
       });
 
@@ -309,7 +328,8 @@ export class AdminController {
   public static async updateQuestion(req: Request, res: Response) {
     try {
       const { id } = req.params;
-      const { text, options, correctOptionId, duration, points, explanation, order } = req.body;
+      const { text, options, correctOptionId, duration, points, explanation, order, imageUrl, afterImageUrl } =
+        req.body;
 
       const updates: any = {};
       if (text) updates.text = text;
@@ -319,6 +339,8 @@ export class AdminController {
       if (points !== undefined) updates.points = Number(points);
       if (explanation !== undefined) updates.explanation = explanation;
       if (order !== undefined) updates.order = Number(order);
+      if (imageUrl !== undefined) updates.imageUrl = (imageUrl || '').trim();
+      if (afterImageUrl !== undefined) updates.afterImageUrl = (afterImageUrl || '').trim();
 
       const updated = db.updateQuestion(id, updates);
       if (!updated) {

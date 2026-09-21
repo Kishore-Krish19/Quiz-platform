@@ -6,3 +6,6 @@ coverage/
 *.log
 .env*
 !.env.example
+
+# Admin-uploaded quiz images (event content, not source)
+data/uploads/

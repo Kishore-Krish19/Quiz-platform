@@ -16,6 +16,8 @@ export interface IQuestionDocument extends Document {
   points: number;
   explanation?: string;
   questionCode?: string;
+  imageUrl?: string;
+  afterImageUrl?: string;
   isActive?: boolean;
   createdAt: Date;
   updatedAt: Date;
@@ -41,6 +43,8 @@ const QuestionSchema = new Schema<IQuestionDocument>(
     points: { type: Number, default: 1000 },
     explanation: { type: String, default: '' },
     questionCode: { type: String, default: '', trim: true },
+    imageUrl: { type: String, default: '', trim: true },
+    afterImageUrl: { type: String, default: '', trim: true },
     isActive: { type: Boolean, default: true },
   },
   {
