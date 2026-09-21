@@ -65,6 +65,19 @@ The application will bind to `0.0.0.0:3000` for both local and LAN access:
 - **Local URL:** `http://localhost:3000`
 - **LAN Access:** `http://<SERVER_LAN_IP>:3000`
 
+### 4. Event Day: Production Mode
+`npm run dev` is for working on the app. For the event itself, build it and run the build:
+```bash
+npm run build
+```
+Then set `NODE_ENV=production` in `.env` and start it:
+```bash
+npm start
+```
+- **Start MongoDB first.** In production the server refuses to start without it. In development it quietly falls back to the sample data file in `data/` and runs the event on that.
+- Players' browsers load one prebuilt bundle instead of hundreds of source files, and no development server is exposed on the network.
+- Run `npm run build` again after any code change — otherwise the previous build keeps running.
+
 ---
 
 ## 🔑 Accounts & Passwords

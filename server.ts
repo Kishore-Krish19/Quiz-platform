@@ -92,6 +92,8 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
+    // Everything in dist/ is public. It must hold only the built client: the server
+    // bundle is built to build/ (see package.json), never in here.
     const distPath = path.join(process.cwd(), 'dist');
     app.use(express.static(distPath));
     app.get('*', (req, res) => {

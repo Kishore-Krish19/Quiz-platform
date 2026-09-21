@@ -57,7 +57,11 @@ export const AdminDocPage: React.FC = () => {
             <pre className="text-xs text-slate-300 font-mono-tech bg-slate-900 p-2.5 rounded overflow-x-auto">
               PORT=3000{'\n'}
               MONGODB_URI=mongodb://127.0.0.1:27017/gadget_code{'\n'}
-              NODE_ENV=production
+              NODE_ENV=production{'\n'}
+              {'\n'}
+              # production serves the built app, so build first:{'\n'}
+              npm run build{'\n'}
+              npm start
             </pre>
           </div>
         </div>
